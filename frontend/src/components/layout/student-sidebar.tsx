@@ -63,8 +63,8 @@ export function StudentNavLinks({ onNavigate }: { onNavigate?: () => void }) {
 /** Reference B's left rail: wordmark, nav pills, amber CTA and account card. */
 export function StudentSidebar() {
   return (
-    <aside className="sticky top-6 hidden w-64 shrink-0 lg:block">
-      <div className="flex h-[calc(100dvh-3rem)] flex-col rounded-panel border border-cream-200 bg-cream-50 p-5 shadow-soft">
+    <aside className="sticky top-6 hidden w-64 shrink-0 self-start lg:block">
+      <div className="flex h-[calc(100dvh-3rem)] flex-col overflow-y-auto rounded-panel border border-cream-200 bg-cream-50 p-5 shadow-soft scrollbar-warm">
         <BrandLogo subtitle="Campus ticketing" />
 
         <div className="mt-8 flex-1 space-y-6">
