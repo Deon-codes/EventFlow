@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/*
+  EventFlow design tokens
+  -----------------------
+  Visual identity (Reference B - "eventbee" warm campus feed):
+    cream canvas, white floating cards, amber/orange primary, deep berry accent,
+    soft pill shapes, generous radii and low-contrast shadows.
+  Organizer dashboard (Reference A - "FoxHR" dark-rail dashboard):
+    charcoal rail, warm off-white workspace, orange highlight bars and
+    orange gradient hero band.
+*/
+@theme {
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* Warm canvas */
+  --color-cream-50: #fffdfa;
+  --color-cream-100: #fef8ef;
+  --color-cream-200: #fbf1e2;
+  --color-cream-300: #f4e6d1;
+  --color-cream-400: #e8d6bb;
+
+  /* Warm neutrals for type */
+  --color-ink-900: #2b2318;
+  --color-ink-800: #3b3225;
+  --color-ink-700: #584c3c;
+  --color-ink-500: #8c8172;
+  --color-ink-400: #a99e8f;
+  --color-ink-300: #c6bcae;
+
+  /* Organizer dashboard charcoal rail */
+  --color-bark-900: #1b1e24;
+  --color-bark-800: #23272f;
+  --color-bark-700: #2f343d;
+  --color-bark-600: #3d434e;
+
+  /* Warm workspace background for the dashboard */
+  --color-cloud-100: #f6f4f1;
+  --color-cloud-200: #efebe5;
+
+  /* Primary amber */
+  --color-brand-50: #fff7e8;
+  --color-brand-100: #fdeacb;
+  --color-brand-200: #fbdb9e;
+  --color-brand-300: #f9c86e;
+  --color-brand-400: #f8b64f;
+  --color-brand-500: #f7a73c;
+  --color-brand-600: #eb9220;
+  --color-brand-700: #cf7913;
+
+  /* Deep berry accent (price / emphasis text in Reference B) */
+  --color-berry-400: #bd4055;
+  --color-berry-500: #a02134;
+  --color-berry-600: #86182a;
+
+  /* Supporting status colours */
+  --color-leaf-500: #2f9e6b;
+  --color-leaf-100: #e2f5eb;
+  --color-mint-500: #2ec4a6;
+  --color-mint-100: #ddf6f0;
+  --color-sky-500: #3d7edb;
+  --color-sky-100: #e5eefb;
+  --color-plum-500: #8a4bb8;
+  --color-plum-100: #f2e9fa;
+  --color-clay-500: #c2603a;
+  --color-clay-100: #fbe8df;
+
+  --radius-card: 1.5rem;
+  --radius-panel: 2rem;
+  --radius-xs: 0.5rem;
+
+  --shadow-soft: 0 18px 40px -28px rgba(63, 46, 22, 0.45);
+  --shadow-float: 0 26px 60px -30px rgba(63, 46, 22, 0.5);
+  --shadow-rail: 0 30px 70px -40px rgba(18, 20, 26, 0.75);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-cream-100);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background-color: var(--color-brand-200);
+    color: var(--color-ink-900);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Slim, warm scrollbars so long event lists stay tidy. */
+@layer utilities {
+  .scrollbar-warm {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-cream-400) transparent;
+  }
+
+  .scrollbar-warm::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-warm::-webkit-scrollbar-thumb {
+    background-color: var(--color-cream-400);
+    border-radius: 999px;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
