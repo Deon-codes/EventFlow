@@ -1,79 +1,77 @@
 @import "tailwindcss";
 
 /*
-  EventFlow design tokens
-  -----------------------
-  Visual identity (Reference B - "eventbee" warm campus feed):
-    cream canvas, white floating cards, amber/orange primary, deep berry accent,
-    soft pill shapes, generous radii and low-contrast shadows.
-  Organizer dashboard (Reference A - "FoxHR" dark-rail dashboard):
-    charcoal rail, warm off-white workspace, orange highlight bars and
-    orange gradient hero band.
+  EventFlow modern design tokens
+  ------------------------------
+  Clean, professional college event ticketing system inspired by BookMyShow:
+  - Slate-50 canvas with pristine white floating cards and subtle borders.
+  - Deep Indigo primary with vibrant emerald & rose accents.
+  - Balanced typography with crisp contrast and generous whitespace.
 */
 @theme {
   --font-sans: var(--font-poppins), ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", sans-serif;
+    "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
 
-  /* Warm canvas */
-  --color-cream-50: #fffdfa;
-  --color-cream-100: #fef8ef;
-  --color-cream-200: #fbf1e2;
-  --color-cream-300: #f4e6d1;
-  --color-cream-400: #e8d6bb;
+  /* Crisp light canvas */
+  --color-cream-50: #ffffff;
+  --color-cream-100: #f8fafc;
+  --color-cream-200: #e2e8f0;
+  --color-cream-300: #cbd5e1;
+  --color-cream-400: #94a3b8;
 
-  /* Warm neutrals for type */
-  --color-ink-900: #2b2318;
-  --color-ink-800: #3b3225;
-  --color-ink-700: #584c3c;
-  --color-ink-500: #8c8172;
-  --color-ink-400: #a99e8f;
-  --color-ink-300: #c6bcae;
+  /* Modern slate neutrals for typography */
+  --color-ink-900: #0f172a;
+  --color-ink-800: #1e293b;
+  --color-ink-700: #334155;
+  --color-ink-500: #64748b;
+  --color-ink-400: #94a3b8;
+  --color-ink-300: #cbd5e1;
 
-  /* Organizer dashboard charcoal rail */
-  --color-bark-900: #1b1e24;
-  --color-bark-800: #23272f;
-  --color-bark-700: #2f343d;
-  --color-bark-600: #3d434e;
+  /* Organizer workspace deep slate rail */
+  --color-bark-900: #0f172a;
+  --color-bark-800: #1e293b;
+  --color-bark-700: #334155;
+  --color-bark-600: #475569;
 
-  /* Warm workspace background for the dashboard */
-  --color-cloud-100: #f6f4f1;
-  --color-cloud-200: #efebe5;
+  /* Modern workspace background */
+  --color-cloud-100: #f8fafc;
+  --color-cloud-200: #f1f5f9;
 
-  /* Primary amber */
-  --color-brand-50: #fff7e8;
-  --color-brand-100: #fdeacb;
-  --color-brand-200: #fbdb9e;
-  --color-brand-300: #f9c86e;
-  --color-brand-400: #f8b64f;
-  --color-brand-500: #f7a73c;
-  --color-brand-600: #eb9220;
-  --color-brand-700: #cf7913;
+  /* Refined Primary Indigo */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
 
-  /* Deep berry accent (price / emphasis text in Reference B) */
-  --color-berry-400: #bd4055;
-  --color-berry-500: #a02134;
-  --color-berry-600: #86182a;
+  /* Vivid Rose/Ruby accent */
+  --color-berry-400: #fb7185;
+  --color-berry-500: #e11d48;
+  --color-berry-600: #be123c;
 
-  /* Supporting status colours */
-  --color-leaf-500: #2f9e6b;
-  --color-leaf-100: #e2f5eb;
-  --color-mint-500: #2ec4a6;
-  --color-mint-100: #ddf6f0;
-  --color-sky-500: #3d7edb;
-  --color-sky-100: #e5eefb;
-  --color-plum-500: #8a4bb8;
-  --color-plum-100: #f2e9fa;
-  --color-clay-500: #c2603a;
-  --color-clay-100: #fbe8df;
+  /* Semantic status colors */
+  --color-leaf-500: #10b981;
+  --color-leaf-100: #ecfdf5;
+  --color-mint-500: #06b6d4;
+  --color-mint-100: #ecfeff;
+  --color-sky-500: #0284c7;
+  --color-sky-100: #f0f9ff;
+  --color-plum-500: #8b5cf6;
+  --color-plum-100: #f5f3ff;
+  --color-clay-500: #f97316;
+  --color-clay-100: #fff7ed;
 
-  --radius-card: 1.5rem;
-  --radius-panel: 2rem;
-  --radius-xs: 0.5rem;
+  --radius-card: 1rem;
+  --radius-panel: 1.25rem;
+  --radius-xs: 0.375rem;
 
-  --shadow-soft: 0 18px 40px -28px rgba(63, 46, 22, 0.45);
-  --shadow-float: 0 26px 60px -30px rgba(63, 46, 22, 0.5);
-  --shadow-rail: 0 30px 70px -40px rgba(18, 20, 26, 0.75);
+  --shadow-soft: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --shadow-float: 0 10px 25px -5px rgba(15, 23, 42, 0.07), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  --shadow-rail: 0 20px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
 }
 
 @layer base {
@@ -90,8 +88,8 @@
   }
 
   ::selection {
-    background-color: var(--color-brand-200);
-    color: var(--color-ink-900);
+    background-color: var(--color-brand-100);
+    color: var(--color-brand-700);
   }
 
   :focus-visible {
@@ -103,24 +101,24 @@
   h2,
   h3,
   h4 {
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    font-weight: 700;
   }
 }
 
-/* Slim, warm scrollbars so long event lists stay tidy. */
 @layer utilities {
   .scrollbar-warm {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-cream-400) transparent;
+    scrollbar-color: var(--color-cream-300) transparent;
   }
 
   .scrollbar-warm::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   .scrollbar-warm::-webkit-scrollbar-thumb {
-    background-color: var(--color-cream-400);
+    background-color: var(--color-cream-300);
     border-radius: 999px;
   }
 

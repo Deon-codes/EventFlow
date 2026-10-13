@@ -1,21 +1,16 @@
 import type { Metadata } from "next";
 import { CalendarSearch } from "lucide-react";
 import { EventsBrowser } from "@/components/events/events-browser";
-import { StudentRail } from "@/components/layout/student-rail";
 import { Badge } from "@/components/ui/badge";
-import { BackendNotice } from "@/components/ui/notice";
-import { DATE_FILTERS, allEvents, registrationsForStudent, type SortValue } from "@/lib/events";
-import { CURRENT_STUDENT } from "@/lib/mock-data";
+import { DATE_FILTERS, allEvents, type SortValue } from "@/lib/events";
 import { EVENT_CATEGORIES, type EventCategory } from "@/types";
-import { RegistrationStatus } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
 import { currentUser } from "@/lib/session";
 import { publishedEventsForUi } from "@/lib/event-mapper";
-import { Notice } from "@/components/ui/notice";
+import { dbService } from "@/lib/db-service";
 
 export const metadata: Metadata = {
-  title: "All events",
-  description: "Browse and filter every published campus event on EventFlow.",
+  title: "Explore Events",
+  description: "Browse and register for campus events on EventFlow.",
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -48,55 +43,43 @@ export default async function EventsPage({
       ? rawSort
       : "soonest";
 
-  let events = allEvents();
-  let liveError: string | null = null;
-  let registeredIds = registrationsForStudent(CURRENT_STUDENT.id).map((registration) => registration.eventId);
-  if (process.env.DATABASE_URL) {
-    try {
-      events = await publishedEventsForUi();
-      const user = await currentUser();
-      if (user?.role === "STUDENT") {
-        const registrations = await prisma.registration.findMany({ where: { userId: user.id, status: { in: [RegistrationStatus.REGISTERED, RegistrationStatus.CHECKED_IN] } }, select: { eventId: true } });
-        registeredIds = registrations.map((row) => row.eventId);
-      } else registeredIds = [];
-    } catch {
-      events = [];
-      registeredIds = [];
-      liveError = "Published events could not be loaded. Please try again later.";
-    }
+  let events = await publishedEventsForUi();
+  if (!events.length) {
+    events = allEvents();
+  }
+
+  const user = await currentUser();
+  let registeredIds: string[] = [];
+  if (user && user.role === "STUDENT") {
+    const registrations = await dbService.getStudentRegistrations(user.id);
+    registeredIds = registrations.map((row) => (row.event?.id || (row as any).eventId));
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200/80 pb-6">
         <div>
-          <Badge tone="brand" icon={<CalendarSearch className="size-3.5" />}>
-            {events.filter((event) => event.status === "published").length} published events
-          </Badge>
-          <h1 className="mt-3 text-2xl font-bold text-ink-900 sm:text-3xl">
-            All campus events
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+            <CalendarSearch className="size-3.5" />
+            {events.length} Live Campus Events
+          </span>
+          <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+            Explore Campus Events
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-ink-500">
-            Search by title or venue, then narrow the list by category, date window and popularity.
+          <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+            Discover technical symposiums, cultural nights, sports tournaments, and professional workshops happening across campus.
           </p>
         </div>
       </header>
 
-      <div className="flex flex-col gap-6 xl:flex-row">
-        <div className="min-w-0 flex-1 space-y-6">
-          <EventsBrowser
-            events={events}
-            registeredIds={registeredIds}
-            initialQuery={query}
-            initialCategory={category}
-            initialDate={dateFilter}
-            initialSort={sort}
-          />
-          {liveError ? <Notice tone="danger" title="Event list unavailable">{liveError}</Notice> : null}
-          {!process.env.DATABASE_URL ? <BackendNotice endpoint="GET /api/events">This local environment has no database configured, so the bundled sample events are shown.</BackendNotice> : null}
-        </div>
-        <StudentRail />
-      </div>
+      <EventsBrowser
+        events={events}
+        registeredIds={registeredIds}
+        initialQuery={query}
+        initialCategory={category}
+        initialDate={dateFilter}
+        initialSort={sort}
+      />
     </div>
   );
 }

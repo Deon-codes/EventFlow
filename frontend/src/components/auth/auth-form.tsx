@@ -1,410 +1,356 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
-  CircleCheckBig,
+  CheckCircle2,
   Eye,
   EyeOff,
   GraduationCap,
+  KeyRound,
+  Loader2,
   ShieldCheck,
+  Sparkles,
   Users,
 } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { Field, Input, Select, Toggle } from "@/components/ui/field";
-import { Notice } from "@/components/ui/notice";
-import { SegmentedControl } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
-import type { UserRole } from "@/types";
 
 type Mode = "signin" | "signup";
-type Errors = Record<string, string>;
-
-const ROLE_OPTIONS = [
-  { value: "student" as UserRole, label: "Student" },
-  { value: "organizer" as UserRole, label: "Organizer" },
-];
-
-const PROGRAMS = [
-  "B.Tech Computer Science",
-  "B.Tech Electronics",
-  "B.Sc Information Systems",
-  "B.Des Communication Design",
-  "BBA Marketing",
-  "B.A Media Studies",
-  "Other programme",
-] as const;
-
-function validate(
-  mode: Mode,
-  role: UserRole,
-  values: Record<string, string>,
-): Errors {
-  const errors: Errors = {};
-  const email = values.email?.trim() ?? "";
-
-  if (!email) {
-    errors.email = "Enter your campus email address.";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-    errors.email = "That does not look like a valid email address.";
-  }
-
-  if (!values.password) {
-    errors.password = "Enter your password.";
-  } else if (values.password.length < 12) {
-    errors.password = "Passwords must be at least 12 characters.";
-  }
-
-  if (mode === "signup") {
-    if (!values.name?.trim()) errors.name = "Tell us your full name.";
-    if (role === "organizer") errors.role = "Organizer accounts must be provisioned by a trusted campus administrator.";
-    if (role === "student" && !values.programme) {
-      errors.programme = "Select the programme you are enrolled in.";
-    }
-    if (role === "organizer" && !values.club?.trim()) {
-      errors.club = "Enter the club, lab or office you organize for.";
-    }
-    if (!values.confirm) {
-      errors.confirm = "Repeat your password to confirm it.";
-    } else if (values.confirm !== values.password) {
-      errors.confirm = "The two passwords do not match.";
-    }
-    if (!values.terms) {
-      errors.terms = "Accept the campus IT policy to continue.";
-    }
-  }
-
-  return errors;
-}
+type Role = "student" | "organizer";
 
 export function AuthForm() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signin");
-  const [role, setRole] = useState<UserRole>("student");
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [terms, setTerms] = useState(false);
-  const [errors, setErrors] = useState<Errors>({});
-  const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
-  const [showPassword, setShowPassword] = useState(false);
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirect");
 
-  function update(key: string, value: string) {
-    setValues((current) => ({ ...current, [key]: value }));
-    setErrors((current) => {
-      if (!current[key]) return current;
-      const next = { ...current };
-      delete next[key];
-      return next;
-    });
+  const [mode, setMode] = useState<Mode>(
+    searchParams.get("mode") === "signup" ? "signup" : "signin"
+  );
+  const [role, setRole] = useState<Role>(
+    searchParams.get("role") === "organizer" ? "organizer" : "student"
+  );
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [terms, setTerms] = useState(false);
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("mode") === "signup") setMode("signup");
+    if (searchParams.get("role") === "organizer") setRole("organizer");
+  }, [searchParams]);
+
+  function fillDemo(demoRole: "student" | "organizer") {
+    setMode("signin");
+    setRole(demoRole);
+    if (demoRole === "student") {
+      setEmail("student@campus.edu");
+      setPassword("Student@123");
+    } else {
+      setEmail("organizer@campus.edu");
+      setPassword("Organizer@123");
+    }
+    setErrors({});
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const nextErrors = validate(mode, role, { ...values, terms: terms ? "yes" : "" });
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+  function validate(): boolean {
+    const nextErrors: Record<string, string> = {};
+    if (!email.trim()) {
+      nextErrors.email = "Please enter your campus email.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      nextErrors.email = "Please enter a valid email address.";
+    }
 
-    setStatus("loading");
+    if (!password) {
+      nextErrors.password = "Please enter your password.";
+    } else if (password.length < 6) {
+      nextErrors.password = "Password must be at least 6 characters.";
+    }
+
+    if (mode === "signup") {
+      if (!name.trim()) {
+        nextErrors.name = "Please enter your full name.";
+      }
+      if (password !== confirmPassword) {
+        nextErrors.confirmPassword = "Passwords do not match.";
+      }
+      if (!terms) {
+        nextErrors.terms = "You must agree to the campus ticketing terms.";
+      }
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setLoading(true);
+    setErrors({});
+
     try {
-      const response = await fetch(mode === "signup" ? "/api/auth/signup" : "/api/auth/login", {
+      const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
+      const payload =
+        mode === "signup"
+          ? { name: name.trim(), email: email.trim(), password, role }
+          : { email: email.trim(), password };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: values.name, email: values.email, password: values.password }),
+        body: JSON.stringify(payload),
       });
-      const result = await response.json();
-      if (!response.ok) {
-        setErrors({ form: result.error ?? "Authentication failed." });
-        setStatus("idle");
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrors({ form: data.error || "Authentication failed. Please try again." });
+        setLoading(false);
         return;
       }
-      setStatus("done");
-      router.replace(result.user?.role === "ORGANIZER" || result.user?.role === "ADMIN" ? "/dashboard" : "/");
+
+      // Success: Route to correct dashboard or redirect URL
+      const userRole = data.user?.role;
+      if (redirectUrl) {
+        router.replace(redirectUrl);
+      } else if (userRole === "ORGANIZER" || userRole === "ADMIN") {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/registrations");
+      }
     } catch {
-      setErrors({ form: "The server could not be reached. Try again." });
-      setStatus("idle");
+      setErrors({ form: "Could not connect to the server. Please check your connection." });
+      setLoading(false);
     }
   }
 
   return (
-    <div className="rounded-panel border border-cream-200 bg-white p-6 shadow-float sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-ink-900">
-          {mode === "signin" ? "Welcome back" : "Create your account"}
-        </h1>
-        <Link
-          href="/"
-          className="text-sm font-semibold text-brand-700 transition-colors hover:text-brand-600"
-        >
-          Back to discover
-        </Link>
-      </div>
-      <p className="mt-1 text-sm text-ink-500">
-        One campus account for students and organizers — your role decides which workspace
-        opens after sign-in.
-      </p>
-
-      <div className="mt-6 space-y-5">
-        <SegmentedControl
-          label="Account action"
-          options={[
-            { value: "signin" as Mode, label: "Sign in" },
-            { value: "signup" as Mode, label: "Create account" },
-          ]}
-          value={mode}
-          onChange={(next) => {
-            setMode(next);
+    <div className="w-full max-w-md mx-auto rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xl shadow-slate-200/50">
+      {/* Tab Switcher: Sign In vs Sign Up */}
+      <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
+        <button
+          type="button"
+          onClick={() => {
+            setMode("signin");
             setErrors({});
-            setStatus("idle");
           }}
-          className="w-full justify-center"
-        />
+          className={cn(
+            "rounded-xl py-2.5 text-xs font-bold transition-all",
+            mode === "signin"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          )}
+        >
+          Sign In
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMode("signup");
+            setErrors({});
+          }}
+          className={cn(
+            "rounded-xl py-2.5 text-xs font-bold transition-all",
+            mode === "signup"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          )}
+        >
+          Create Account
+        </button>
+      </div>
 
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500">
-            I am signing in as
-          </p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {ROLE_OPTIONS.map((option) => {
-              const active = role === option.value;
-              const Icon = option.value === "student" ? GraduationCap : Users;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setRole(option.value)}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors",
-                    active
-                      ? "border-brand-400 bg-brand-50 text-ink-900"
-                      : "border-cream-300 bg-white text-ink-500 hover:border-brand-300",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "grid size-8 place-items-center rounded-xl",
-                      active ? "bg-brand-500 text-white" : "bg-cream-200 text-ink-500",
-                    )}
-                  >
-                    <Icon className="size-4" />
-                  </span>
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {status === "done" ? (
-          <div className="space-y-4 rounded-2xl border border-cream-200 bg-cream-50 p-5">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold text-leaf-500">
-              <CircleCheckBig className="size-4" />
-              Signed in successfully
-            </p>
-            <p className="text-sm text-ink-700">
-              Your account is authenticated with a secure server session. Passwords are never returned by the API.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <ButtonLink href="/" size="sm" variant="secondary">
-                Discover events
-              </ButtonLink>
-              <ButtonLink href="/dashboard" size="sm">
-                Open dashboard
-              </ButtonLink>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setStatus("idle");
-              }}
-            >
-              Edit details
-            </Button>
-          </div>
-        ) : (
-          <form noValidate onSubmit={submit} className="space-y-4">
-            {Object.keys(errors).length > 0 ? (
-              <Notice tone="danger" title="Please fix the highlighted fields">
-                <ul className="mt-1 list-disc space-y-1 pl-4">
-                  {Object.entries(errors).map(([key, message]) => (
-                    <li key={key}>{message}</li>
-                  ))}
-                </ul>
-              </Notice>
-            ) : null}
-
-            {mode === "signup" ? (
-              <Field id="name" label="Full name" required error={errors.name}>
-                <Input
-                  id="name"
-                  name="name"
-                  autoComplete="name"
-                  placeholder="Maya Rodrigues"
-                  value={values.name ?? ""}
-                  invalid={Boolean(errors.name)}
-                  onChange={(event) => update("name", event.target.value)}
-                />
-              </Field>
-            ) : null}
-
-            <Field
-              id="email"
-              label="Campus email"
-              required
-              error={errors.email}
-              hint={mode === "signup" ? "Use your @campus.edu address to verify you are enrolled." : undefined}
-            >
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@campus.edu"
-                value={values.email ?? ""}
-                invalid={Boolean(errors.email)}
-                onChange={(event) => update("email", event.target.value)}
-              />
-            </Field>
-
-            {mode === "signup" && role === "student" ? (
-              <Field id="programme" label="Programme" required error={errors.programme}>
-                <Select
-                  id="programme"
-                  value={values.programme ?? ""}
-                  invalid={Boolean(errors.programme)}
-                  onChange={(event) => update("programme", event.target.value)}
-                >
-                  <option value="">Select your programme</option>
-                  {PROGRAMS.map((programme) => (
-                    <option key={programme} value={programme}>
-                      {programme}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            ) : null}
-
-            {mode === "signup" && role === "organizer" ? (
-              <Field
-                id="club"
-                label="Club, lab or office"
-                required
-                error={errors.club}
-                hint="Organizer access is granted per club by the Student Activities Office."
-              >
-                <Input
-                  id="club"
-                  placeholder="Design Collective"
-                  value={values.club ?? ""}
-                  invalid={Boolean(errors.club)}
-                  onChange={(event) => update("club", event.target.value)}
-                />
-              </Field>
-            ) : null}
-
-            <Field
-              id="password"
-              label="Password"
-              required
-              error={errors.password}
-              hint={mode === "signup" ? "Minimum 12 characters." : undefined}
-              action={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((current) => !current)}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-ink-500 hover:text-ink-900"
-                >
-                  {showPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              }
-            >
-              <Input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                placeholder="••••••••"
-                value={values.password ?? ""}
-                invalid={Boolean(errors.password)}
-                onChange={(event) => update("password", event.target.value)}
-              />
-            </Field>
-
-            {mode === "signup" ? (
-              <>
-                <Field id="confirm" label="Confirm password" required error={errors.confirm}>
-                  <Input
-                    id="confirm"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    placeholder="••••••••"
-                    value={values.confirm ?? ""}
-                    invalid={Boolean(errors.confirm)}
-                    onChange={(event) => update("confirm", event.target.value)}
-                  />
-                </Field>
-
-                <div>
-                  <Toggle
-                    id="terms"
-                    label="Accept the campus IT usage policy"
-                    description="EventFlow stores only your registration history and never shares it with third parties."
-                    checked={terms}
-                    onChange={(next) => {
-                      setTerms(next);
-                      setErrors((current) => {
-                        if (!current.terms) return current;
-                        const copy = { ...current };
-                        delete copy.terms;
-                        return copy;
-                      });
-                    }}
-                  />
-                  {errors.terms ? (
-                    <p role="alert" className="mt-1.5 text-xs font-medium text-berry-500">
-                      {errors.terms}
-                    </p>
-                  ) : null}
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center justify-between text-sm">
-                <span
-                  className="cursor-not-allowed text-ink-400"
-                  title="Password reset arrives with the backend milestone"
-                >
-                  Forgot password?
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-leaf-500">
-                  <ShieldCheck className="size-3.5" />
-                  Campus SSO planned
-                </span>
-              </div>
+      {/* Role Picker */}
+      <div className="mt-6">
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          I am signing in as
+        </label>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setRole("student")}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold transition-all",
+              role === "student"
+                ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
             )}
+          >
+            <GraduationCap className="size-4" />
+            Student
+          </button>
+          <button
+            type="button"
+            onClick={() => setRole("organizer")}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold transition-all",
+              role === "organizer"
+                ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+            )}
+          >
+            <Users className="size-4" />
+            Organizer
+          </button>
+        </div>
+      </div>
 
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full"
-              loading={status === "loading"}
-              icon={<ArrowRight className="size-4" />}
-            >
-              {status === "loading"
-                ? "Validating…"
-                : mode === "signin"
-                  ? `Sign in as ${role}`
-                  : "Create account"}
-            </Button>
-          </form>
+      {/* Demo Credentials Helper Chips */}
+      <div className="mt-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 p-3">
+        <p className="flex items-center gap-1.5 text-[0.7rem] font-bold text-indigo-800 uppercase tracking-wider">
+          <Sparkles className="size-3" /> Quick Demo One-Click Login
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => fillDemo("student")}
+            className="rounded-lg bg-white border border-indigo-200 px-2.5 py-1 text-[0.7rem] font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
+          >
+            Student Account
+          </button>
+          <button
+            type="button"
+            onClick={() => fillDemo("organizer")}
+            className="rounded-lg bg-white border border-indigo-200 px-2.5 py-1 text-[0.7rem] font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
+          >
+            Organizer Account
+          </button>
+        </div>
+      </div>
+
+      {/* Form Error Banner */}
+      {errors.form && (
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700">
+          {errors.form}
+        </div>
+      )}
+
+      {/* Main Auth Form */}
+      <form noValidate onSubmit={handleSubmit} className="mt-5 space-y-4">
+        {mode === "signup" && (
+          <div>
+            <label className="block text-xs font-bold text-slate-700">Full Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Maya Rodrigues"
+              className={cn(
+                "mt-1.5 h-11 w-full rounded-xl border bg-slate-50 px-3.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2",
+                errors.name
+                  ? "border-rose-300 focus:ring-rose-500/20"
+                  : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+              )}
+            />
+            {errors.name && <p className="mt-1 text-xs text-rose-600">{errors.name}</p>}
+          </div>
         )}
 
-        <Notice tone="warning" className="text-xs">
-          <span className="font-semibold">Secure sign-in.</span> Account roles and permissions are verified on the server for protected actions.
-        </Notice>
-      </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-700">Campus Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@campus.edu"
+            className={cn(
+              "mt-1.5 h-11 w-full rounded-xl border bg-slate-50 px-3.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2",
+              errors.email
+                ? "border-rose-300 focus:ring-rose-500/20"
+                : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+            )}
+          />
+          {errors.email && <p className="mt-1 text-xs text-rose-600">{errors.email}</p>}
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold text-slate-700">Password</label>
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="flex items-center gap-1 text-[0.7rem] font-semibold text-slate-500 hover:text-slate-800"
+            >
+              {showPassword ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+          <input
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className={cn(
+              "mt-1.5 h-11 w-full rounded-xl border bg-slate-50 px-3.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2",
+              errors.password
+                ? "border-rose-300 focus:ring-rose-500/20"
+                : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+            )}
+          />
+          {errors.password && <p className="mt-1 text-xs text-rose-600">{errors.password}</p>}
+        </div>
+
+        {mode === "signup" && (
+          <div>
+            <label className="block text-xs font-bold text-slate-700">Confirm Password</label>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              className={cn(
+                "mt-1.5 h-11 w-full rounded-xl border bg-slate-50 px-3.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2",
+                errors.confirmPassword
+                  ? "border-rose-300 focus:ring-rose-500/20"
+                  : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+              )}
+            />
+            {errors.confirmPassword && (
+              <p className="mt-1 text-xs text-rose-600">{errors.confirmPassword}</p>
+            )}
+
+            <div className="mt-3 flex items-start gap-2">
+              <input
+                id="terms-check"
+                type="checkbox"
+                checked={terms}
+                onChange={(e) => setTerms(e.target.checked)}
+                className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <label htmlFor="terms-check" className="text-xs text-slate-600">
+                I agree to the campus event ticketing usage guidelines and code of conduct.
+              </label>
+            </div>
+            {errors.terms && <p className="mt-1 text-xs text-rose-600">{errors.terms}</p>}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-md shadow-indigo-600/20 transition-all hover:bg-indigo-700 hover:shadow-indigo-600/30 disabled:opacity-70"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              {mode === "signin" ? "Signing In…" : "Creating Account…"}
+            </>
+          ) : (
+            <>
+              {mode === "signin" ? `Sign In as ${role}` : `Register as ${role}`}
+              <ArrowRight className="size-4" />
+            </>
+          )}
+        </button>
+      </form>
     </div>
   );
 }

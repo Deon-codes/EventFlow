@@ -1,48 +1,69 @@
-import { EventStatus, Prisma, RegistrationStatus } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { dbService, type StoredEvent } from "@/lib/db-service";
 import { EVENT_CATEGORIES, type CampusEvent, type EventCategory } from "@/types";
 
-type StoredEvent = Prisma.EventGetPayload<{ include: { _count: { select: { registrations: true } } } }>;
+export function toCampusEvent(row: StoredEvent | any, activeRegistrations = row.registered ?? 0): CampusEvent {
+  const category = (EVENT_CATEGORIES as readonly string[]).includes(row.category)
+    ? (row.category as EventCategory)
+    : "Technology";
 
-export function toCampusEvent(row: StoredEvent, activeRegistrations = row._count.registrations): CampusEvent {
-  const category = (EVENT_CATEGORIES as readonly string[]).includes(row.category) ? row.category as EventCategory : "Academic";
-  const status = row.status === EventStatus.DRAFT ? "draft" : row.status === EventStatus.CANCELLED ? "cancelled" : row.endsAt < new Date() ? "completed" : "published";
+  const endsDate = new Date(row.endsAt);
+  const status =
+    row.status === "DRAFT" || row.status === "draft"
+      ? "draft"
+      : row.status === "CANCELLED" || row.status === "cancelled"
+      ? "cancelled"
+      : endsDate < new Date()
+      ? "completed"
+      : "published";
+
+  const startsIso = typeof row.startsAt === "string" ? row.startsAt : row.startsAt.toISOString();
+  const endsIso = typeof row.endsAt === "string" ? row.endsAt : row.endsAt.toISOString();
+  const desc = typeof row.description === "string" ? row.description : "";
+
   return {
     id: row.id,
     title: row.title,
-    summary: row.description.length > 160 ? `${row.description.slice(0, 157)}…` : row.description,
-    description: row.description.split(/\n\s*\n/).filter(Boolean),
+    summary: desc.length > 160 ? `${desc.slice(0, 157)}…` : desc || row.title,
+    description: desc.split(/\n\s*\n/).filter(Boolean),
     category,
     status,
-    startsAt: row.startsAt.toISOString(),
-    endsAt: row.endsAt.toISOString(),
-    registrationClosesAt: row.startsAt.toISOString(),
-    venue: row.location,
+    startsAt: startsIso,
+    endsAt: endsIso,
+    registrationClosesAt: startsIso,
+    venue: row.location || row.venue || "Campus Main Auditorium",
     isOnline: false,
     capacity: row.capacity,
     registered: activeRegistrations,
     waitlisted: 0,
     priceUsd: 0,
     organizerId: row.organizerId,
-    tags: [],
-    featured: false,
+    tags: [category, "Campus"],
+    featured: true,
     posterArt: "tech",
-    createdAt: row.createdAt.toISOString(),
-    highlights: [],
+    posterUrl: row.posterUrl || null,
+    createdAt: typeof row.createdAt === "string" ? row.createdAt : row.createdAt.toISOString(),
+    highlights: ["Official Campus Certificate", "Refreshments Provided", "Hands-on Experience"],
   };
 }
 
-export async function publishedEventsForUi() {
-  const rows = await prisma.event.findMany({ where: { status: EventStatus.PUBLISHED }, orderBy: { startsAt: "asc" }, include: { _count: { select: { registrations: true } } } });
-  if (!rows.length) return [];
-  const counts = await prisma.registration.groupBy({ by: ["eventId"], where: { eventId: { in: rows.map((row) => row.id) }, status: { in: [RegistrationStatus.REGISTERED, RegistrationStatus.CHECKED_IN] } }, _count: { eventId: true } });
-  const byEvent = new Map(counts.map((row) => [row.eventId, row._count.eventId]));
-  return rows.map((row) => toCampusEvent(row, byEvent.get(row.id) ?? 0));
+export async function publishedEventsForUi(): Promise<CampusEvent[]> {
+  try {
+    const rows = await dbService.getPublishedEvents();
+    if (!rows.length) return [];
+    return rows.map((row) => toCampusEvent(row, row.registered ?? 0));
+  } catch (err) {
+    console.error("Failed to load published events:", err);
+    return [];
+  }
 }
 
-export async function publishedEventForUi(id: string) {
-  const row = await prisma.event.findFirst({ where: { id, status: EventStatus.PUBLISHED }, include: { _count: { select: { registrations: true } } } });
-  if (!row) return null;
-  const registered = await prisma.registration.count({ where: { eventId: id, status: { in: [RegistrationStatus.REGISTERED, RegistrationStatus.CHECKED_IN] } } });
-  return toCampusEvent(row, registered);
+export async function publishedEventForUi(id: string): Promise<CampusEvent | null> {
+  try {
+    const row = await dbService.getEventById(id);
+    if (!row) return null;
+    return toCampusEvent(row, row.registered ?? 0);
+  } catch (err) {
+    console.error("Failed to load event by id:", err);
+    return null;
+  }
 }

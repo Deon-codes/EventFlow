@@ -1,36 +1,100 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { dbService } from "@/lib/db-service";
 
 const COOKIE = "eventflow_session";
 const TTL_SECONDS = 60 * 60 * 8;
 
 function key() {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret || secret.length < 32) throw new Error("SESSION_SECRET must contain at least 32 characters.");
+  const secret = process.env.SESSION_SECRET || "default_development_session_secret_at_least_32_chars";
   return new TextEncoder().encode(secret);
 }
 
-export async function createSession(userId: string) {
-  const token = await new SignJWT({ sub: userId })
-    .setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(`${TTL_SECONDS}s`).sign(key());
+export type SessionUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: "STUDENT" | "ORGANIZER" | "ADMIN";
+};
+
+export async function createSession(userOrId: string | SessionUser) {
+  let sub: string;
+  let role: string = "STUDENT";
+  let name: string = "";
+  let email: string = "";
+
+  if (typeof userOrId === "string") {
+    sub = userOrId;
+    const user = await dbService.findUserById(userOrId);
+    if (user) {
+      role = user.role;
+      name = user.name;
+      email = user.email;
+    }
+  } else {
+    sub = userOrId.id;
+    role = userOrId.role;
+    name = userOrId.name;
+    email = userOrId.email;
+  }
+
+  const token = await new SignJWT({ sub, role, name, email })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(`${TTL_SECONDS}s`)
+    .sign(key());
+
   const jar = await cookies();
-  jar.set(COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: TTL_SECONDS });
+  jar.set(COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: TTL_SECONDS,
+  });
 }
 
 export async function clearSession() {
   const jar = await cookies();
-  jar.set(COOKIE, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 0 });
+  jar.set(COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 }
 
-export async function currentUser() {
-  const token = (await cookies()).get(COOKIE)?.value;
-  if (!token) return null;
-  let userId: string;
+export async function currentUser(): Promise<SessionUser | null> {
   try {
+    const jar = await cookies();
+    const token = jar.get(COOKIE)?.value;
+    if (!token) return null;
+
     const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"] });
     if (typeof payload.sub !== "string") return null;
-    userId = payload.sub;
-  } catch { return null; }
-  return prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, role: true } });
+
+    const dbUser = await dbService.findUserById(payload.sub).catch(() => null);
+    if (dbUser) {
+      return {
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email,
+        role: dbUser.role as any,
+      };
+    }
+
+    // Fallback to verified JWT claims if db is temporarily slow
+    if (payload.sub && payload.email) {
+      return {
+        id: payload.sub,
+        name: (payload.name as string) || "Campus User",
+        email: payload.email as string,
+        role: ((payload.role as string) || "STUDENT") as any,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }

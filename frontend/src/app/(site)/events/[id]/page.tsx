@@ -4,12 +4,12 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
-  CalendarPlus,
-  Check,
+  CheckCircle2,
   Clock,
   Globe,
   MapPin,
   Share2,
+  Sparkles,
   Ticket,
   Users,
 } from "lucide-react";
@@ -17,27 +17,20 @@ import { EventPoster } from "@/components/events/event-poster";
 import { RegisterButton } from "@/components/events/register-button";
 import { EventCard } from "@/components/events/event-card";
 import { CategoryBadge, EventStatusBadge } from "@/components/events/status-badge";
-import { StudentRail } from "@/components/layout/student-rail";
-import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, SectionHeading } from "@/components/ui/card";
 import { CapacityMeter } from "@/components/ui/progress";
-import { Notice } from "@/components/ui/notice";
 import {
   allEvents,
   fillRate,
   getEventById,
   isSoldOut,
-  registrationFor,
-  registrationsForEvent,
   relatedEvents,
   spotsLeft,
 } from "@/lib/events";
-import { CURRENT_ORGANIZER, CURRENT_STUDENT } from "@/lib/mock-data";
 import { publishedEventForUi } from "@/lib/event-mapper";
+import { currentUser } from "@/lib/session";
+import { dbService } from "@/lib/db-service";
 import {
   formatFullDate,
-  formatShortDate,
   formatTimeRange,
   formatPrice,
   relativeDayLabel,
@@ -53,13 +46,12 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  let event = getEventById(id);
-  if (!event && process.env.DATABASE_URL) {
-    event = await publishedEventForUi(id) ?? undefined;
-  }
+  let event = await publishedEventForUi(id);
+  if (!event) event = getEventById(id) || null;
   if (!event) return { title: "Event not found" };
+
   return {
-    title: event.title,
+    title: `${event.title} · EventFlow`,
     description: event.summary,
   };
 }
@@ -70,285 +62,198 @@ export default async function EventDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  let event = getEventById(id);
-  const isStoredEvent = !event && Boolean(process.env.DATABASE_URL);
-  if (!event && process.env.DATABASE_URL) {
-    event = await publishedEventForUi(id) ?? undefined;
+  let event = await publishedEventForUi(id);
+  if (!event) {
+    event = getEventById(id) || null;
   }
   if (!event) notFound();
 
-  const myRegistration = isStoredEvent ? null : registrationFor(event.id, CURRENT_STUDENT.id);
-  const related = relatedEvents(event);
-  const attendees = isStoredEvent ? [] : registrationsForEvent(event.id);
+  const user = await currentUser();
+  let userRegistration = null;
+  if (user && user.role === "STUDENT") {
+    const registrations = await dbService.getStudentRegistrations(user.id);
+    const found = registrations.find((r) => (r.event?.id || (r as any).eventId) === event.id);
+    if (found) {
+      userRegistration = {
+        id: found.id,
+        eventId: event.id,
+        studentId: user.id,
+        studentName: user.name,
+        studentEmail: user.email,
+        programme: "Student",
+        year: "",
+        status: (found.status === "REGISTERED" || found.status === "CHECKED_IN" ? "confirmed" : "cancelled") as any,
+        registeredAt: typeof found.createdAt === "string" ? found.createdAt : (found.createdAt as Date).toISOString(),
+        ticketCode: found.ticketCode,
+      };
+    }
+  }
+
+  const related = relatedEvents(event, 3);
   const soldOut = isSoldOut(event);
-  const confirmed = attendees.filter((entry) => entry.status === "confirmed").length;
 
   return (
-    <div className="space-y-6">
-      <Link
-        href="/events"
-        className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 transition-colors hover:text-ink-900"
-      >
-        <ArrowLeft className="size-4" />
-        Back to all events
-      </Link>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-12">
+      {/* Breadcrumb Back Link */}
+      <div>
+        <Link
+          href="/events"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-indigo-600"
+        >
+          <ArrowLeft className="size-4" />
+          Back to all events
+        </Link>
+      </div>
 
-      <div className="flex flex-col gap-6 xl:flex-row">
-        <div className="min-w-0 flex-1 space-y-6">
-          <Card className="overflow-hidden">
-            <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
-              <EventPoster
-                event={event}
-                rounded="rounded-none"
-                className="h-64 w-full lg:h-full lg:min-h-[22rem]"
-              />
-              <div className="p-6 sm:p-7">
+      {/* Main Event Showcase Grid */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Left Column: Media & Event Description */}
+        <div className="space-y-8 lg:col-span-2">
+          {/* Large Event Banner */}
+          <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-900">
+              <EventPoster event={event} rounded="rounded-none" className="h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              <div className="absolute bottom-6 left-6 right-6 text-white">
                 <div className="flex flex-wrap items-center gap-2">
                   <CategoryBadge category={event.category} />
-                  <EventStatusBadge status={event.status} />
-                  {myRegistration ? (
-                    <Badge tone="leaf" icon={<Ticket className="size-3.5" />}>
-                      You have a ticket
-                    </Badge>
-                  ) : null}
+                  <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur-sm">
+                    {relativeDayLabel(event.startsAt)}
+                  </span>
                 </div>
-
-                <h1 className="mt-4 text-2xl font-bold leading-tight text-ink-900 sm:text-3xl">
+                <h1 className="mt-3 text-2xl font-extrabold sm:text-4xl text-white">
                   {event.title}
                 </h1>
-                <p className="mt-2 text-sm leading-relaxed text-ink-500">{event.summary}</p>
-
-                <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700">
-                      <CalendarDays aria-hidden="true" className="size-4" />
-                    </span>
-                    <div>
-                      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-400">
-                        Date
-                      </dt>
-                      <dd className="text-sm font-medium text-ink-900">
-                        {formatFullDate(event.startsAt)}
-                      </dd>
-                      <dd className="text-xs text-ink-500">
-                        {relativeDayLabel(event.startsAt)}
-                        {event.endsAt.slice(0, 10) !== event.startsAt.slice(0, 10)
-                          ? " · runs overnight"
-                          : ""}
-                      </dd>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700">
-                      <Clock aria-hidden="true" className="size-4" />
-                    </span>
-                    <div>
-                      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-400">
-                        Time
-                      </dt>
-                      <dd className="text-sm font-medium text-ink-900">
-                        {formatTimeRange(event.startsAt, event.endsAt)}
-                      </dd>
-                      <dd className="text-xs text-ink-500">
-                        Ends {formatShortDate(event.endsAt)}
-                      </dd>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700">
-                      <MapPin aria-hidden="true" className="size-4" />
-                    </span>
-                    <div>
-                      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-400">
-                        Venue
-                      </dt>
-                      <dd className="text-sm font-medium text-ink-900">{event.venue}</dd>
-                      <dd className="text-xs text-ink-500">
-                        {event.building}
-                        {event.isOnline ? " · online stream available" : ""}
-                      </dd>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700">
-                      <Users aria-hidden="true" className="size-4" />
-                    </span>
-                    <div>
-                      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-400">
-                        Organizer
-                      </dt>
-                      <dd className="flex items-center gap-2 text-sm font-medium text-ink-900">
-                        <Avatar
-                          name={CURRENT_ORGANIZER.name}
-                          tone={CURRENT_ORGANIZER.avatarTone}
-                          size="sm"
-                        />
-                        {CURRENT_ORGANIZER.name}
-                      </dd>
-                      <dd className="text-xs text-ink-500">{CURRENT_ORGANIZER.programme}</dd>
-                    </div>
-                  </div>
-                </dl>
-
-                <ul className="mt-6 flex flex-wrap gap-2">
-                  {event.tags.map((tag) => (
-                    <li key={tag}>
-                      <Badge tone="outline">{tag}</Badge>
-                    </li>
-                  ))}
-                </ul>
               </div>
-            </div>
-          </Card>
-
-          <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold text-ink-900">About this event</h2>
-              <div className="mt-3 space-y-3 text-sm leading-relaxed text-ink-700">
-                {event.description.map((paragraph) => (
-                  <p key={paragraph.slice(0, 24)}>{paragraph}</p>
-                ))}
-              </div>
-
-              <h3 className="mt-6 text-sm font-semibold uppercase tracking-[0.12em] text-ink-400">
-                What to expect
-              </h3>
-              <ul className="mt-3 space-y-2.5">
-                {event.highlights.map((highlight) => (
-                  <li key={highlight} className="flex items-start gap-2.5 text-sm text-ink-700">
-                    <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-leaf-100 text-leaf-500">
-                      <Check className="size-3" />
-                    </span>
-                    {highlight}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-
-            <div className="space-y-6">
-              <Card>
-                <CardHeader
-                  title="Registration"
-                  description={
-                    event.status === "completed"
-                      ? "This event has finished"
-                      : `Closes ${formatShortDate(event.registrationClosesAt)}`
-                  }
-                  icon={<Ticket className="size-4" />}
-                />
-                <div className="space-y-4 px-5 py-5">
-                  <div className="flex items-end justify-between gap-3">
-                    <div>
-                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink-400">
-                        {event.priceUsd > 0 ? "Ticket price" : "Entry"}
-                      </p>
-                      <p
-                        className={
-                          event.priceUsd > 0
-                            ? "text-2xl font-semibold text-berry-500"
-                            : "text-2xl font-semibold text-leaf-500"
-                        }
-                      >
-                        {formatPrice(event.priceUsd)}
-                      </p>
-                    </div>
-                    <Badge tone={soldOut ? "berry" : "leaf"} dot>
-                      {soldOut ? "Waitlist only" : `${spotsLeft(event)} seats left`}
-                    </Badge>
-                  </div>
-
-                  <CapacityMeter
-                    registered={event.registered}
-                    capacity={event.capacity}
-                    waitlisted={event.waitlisted}
-                  />
-
-                  <RegisterButton event={event} initialRegistration={myRegistration ?? null} />
-
-                  <div className="flex flex-wrap gap-2">
-                    <span
-                      className="inline-flex h-10 flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-full border border-cream-300 text-xs font-semibold text-ink-400"
-                      title="Calendar sync arrives with the backend milestone"
-                    >
-                      <CalendarPlus className="size-4" />
-                      Add to calendar
-                    </span>
-                    <span
-                      className="inline-flex h-10 flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-full border border-cream-300 text-xs font-semibold text-ink-400"
-                      title="Share links arrive with the backend milestone"
-                    >
-                      <Share2 className="size-4" />
-                      Share
-                    </span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card>
-                <CardHeader
-                  title="Who's going"
-                  description={`${confirmed} confirmed · ${fillRate(event)}% full`}
-                  icon={<Users className="size-4" />}
-                />
-                <ul className="space-y-3 px-5 py-5">
-                  {attendees.slice(0, 4).map((attendee) => (
-                    <li key={attendee.id} className="flex items-center gap-3">
-                      <Avatar name={attendee.studentName} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-ink-900">
-                          {attendee.studentName}
-                        </p>
-                        <p className="truncate text-xs text-ink-500">{attendee.programme}</p>
-                      </div>
-                    </li>
-                  ))}
-                  {attendees.length === 0 ? (
-                    <li className="text-sm text-ink-500">
-                      No registrations yet — be the first to reserve a seat.
-                    </li>
-                  ) : null}
-                  {attendees.length > 4 ? (
-                    <li className="text-xs text-ink-400">
-                      +{attendees.length - 4} more students registered
-                    </li>
-                  ) : null}
-                </ul>
-              </Card>
-
-              <Notice tone="info" className="text-xs">
-                <span className="font-semibold">Map placeholder.</span> An interactive venue map
-                will render here once campus location data is available from the backend.
-                {event.isOnline ? (
-                  <span className="mt-1 flex items-center gap-1.5 text-ink-500">
-                    <Globe aria-hidden="true" className="size-3.5" />
-                    Online attendees receive a stream link by email.
-                  </span>
-                ) : null}
-              </Notice>
             </div>
           </div>
 
-          <section className="space-y-4">
-            <SectionHeading
-              eyebrow="You might also like"
-              title="Related events"
-              description="Picked by category and shared tags."
-            />
-            <ul className="grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
-              {related.map((candidate) => (
-                <li key={candidate.id} className="h-full">
-                  <EventCard event={candidate} />
-                </li>
-              ))}
-            </ul>
-          </section>
+          {/* Key Event Details Card */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm space-y-6">
+            <h2 className="text-xl font-bold text-slate-900">Event Overview</h2>
+            <div className="space-y-4 text-base leading-relaxed text-slate-600">
+              {Array.isArray(event.description) ? (
+                event.description.map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
+                ))
+              ) : (
+                <p>{event.description || event.summary}</p>
+              )}
+            </div>
+
+            {/* Highlights */}
+            <div className="border-t border-slate-100 pt-6">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+                What's Included
+              </h3>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {[
+                  "Official Campus Participation Certificate",
+                  "Networking with mentors and club leads",
+                  "Verified E-Ticket with Entrance QR Code",
+                  "Refreshments & event kit provided",
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2.5 text-sm font-medium text-slate-700">
+                    <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Schedule & Venue Card */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900">Date & Location</h2>
+            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div className="flex items-start gap-3.5 rounded-2xl bg-slate-50 p-4">
+                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-700">
+                  <CalendarDays className="size-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Date & Time</p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">{formatFullDate(event.startsAt)}</p>
+                  <p className="text-xs text-slate-500">{formatTimeRange(event.startsAt, event.endsAt)}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3.5 rounded-2xl bg-slate-50 p-4">
+                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-700">
+                  <MapPin className="size-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Venue</p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">{event.venue}</p>
+                  <p className="text-xs text-slate-500">Campus Central Campus Premises</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <StudentRail />
+        {/* Right Column: Ticket Booking Card */}
+        <div className="space-y-6">
+          <div className="sticky top-24 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/50">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Admission</p>
+                <p className="text-2xl font-black text-emerald-600">
+                  {event.priceUsd > 0 ? formatPrice(event.priceUsd) : "Free Ticket"}
+                </p>
+              </div>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                Verified Seat
+              </span>
+            </div>
+
+            {/* Capacity Meter */}
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-slate-600">Available Capacity</span>
+                <span className="text-slate-900">{spotsLeft(event)} seats remaining</span>
+              </div>
+              <CapacityMeter rate={fillRate(event)} />
+              <p className="text-[0.7rem] text-slate-400">
+                {event.registered} / {event.capacity} seats reserved so far
+              </p>
+            </div>
+
+            {/* Booking action button */}
+            <div className="mt-6">
+              <RegisterButton
+                event={event}
+                initialRegistration={userRegistration}
+              />
+            </div>
+
+            {/* Extra perks / note */}
+            <div className="mt-6 space-y-3 rounded-2xl bg-slate-50 p-4 text-xs text-slate-500">
+              <p className="flex items-center gap-2">
+                <Ticket className="size-4 text-indigo-600" />
+                Instant confirmation saved to My Tickets
+              </p>
+              <p className="flex items-center gap-2">
+                <Users className="size-4 text-indigo-600" />
+                Valid for one registered student seat
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Related Events Carousel */}
+      {related.length > 0 && (
+        <section className="border-t border-slate-200 pt-12">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+            Similar Campus Events You Might Like
+          </h2>
+          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {related.map((rel) => (
+              <EventCard key={rel.id} event={rel} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

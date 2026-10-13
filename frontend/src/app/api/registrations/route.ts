@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
-import { apiError } from "@/lib/api-response";
+import { dbService } from "@/lib/db-service";
+
+export const runtime = "nodejs";
 
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sign-in is required." }, { status: 401 });
+
   try {
-    const rows = await prisma.registration.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, select: { id: true, ticketCode: true, status: true, createdAt: true, checkedInAt: true, event: { select: { id: true, title: true, category: true, location: true, startsAt: true, endsAt: true, posterUrl: true } } } });
+    const rows = await dbService.getStudentRegistrations(user.id);
     return NextResponse.json(rows);
-  } catch (error) { return apiError(error); }
+  } catch (error) {
+    console.error("GET /api/registrations error:", error);
+    return NextResponse.json({ error: "Could not retrieve registrations." }, { status: 500 });
+  }
 }
