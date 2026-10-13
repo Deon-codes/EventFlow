@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CircleCheckBig,
@@ -52,12 +53,13 @@ function validate(
 
   if (!values.password) {
     errors.password = "Enter your password.";
-  } else if (values.password.length < 8) {
-    errors.password = "Passwords must be at least 8 characters.";
+  } else if (values.password.length < 12) {
+    errors.password = "Passwords must be at least 12 characters.";
   }
 
   if (mode === "signup") {
     if (!values.name?.trim()) errors.name = "Tell us your full name.";
+    if (role === "organizer") errors.role = "Organizer accounts must be provisioned by a trusted campus administrator.";
     if (role === "student" && !values.programme) {
       errors.programme = "Select the programme you are enrolled in.";
     }
@@ -78,6 +80,7 @@ function validate(
 }
 
 export function AuthForm() {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("signin");
   const [role, setRole] = useState<UserRole>("student");
   const [values, setValues] = useState<Record<string, string>>({});
@@ -96,14 +99,31 @@ export function AuthForm() {
     });
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validate(mode, role, { ...values, terms: terms ? "yes" : "" });
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
     setStatus("loading");
-    window.setTimeout(() => setStatus("done"), 900);
+    try {
+      const response = await fetch(mode === "signup" ? "/api/auth/signup" : "/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: values.name, email: values.email, password: values.password }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setErrors({ form: result.error ?? "Authentication failed." });
+        setStatus("idle");
+        return;
+      }
+      setStatus("done");
+      router.replace(result.user?.role === "ORGANIZER" || result.user?.role === "ADMIN" ? "/dashboard" : "/");
+    } catch {
+      setErrors({ form: "The server could not be reached. Try again." });
+      setStatus("idle");
+    }
   }
 
   return (
@@ -180,20 +200,17 @@ export function AuthForm() {
           <div className="space-y-4 rounded-2xl border border-cream-200 bg-cream-50 p-5">
             <p className="inline-flex items-center gap-2 text-sm font-semibold text-leaf-500">
               <CircleCheckBig className="size-4" />
-              Form validated — nothing was sent
+              Signed in successfully
             </p>
             <p className="text-sm text-ink-700">
-              EventFlow has no authentication in this milestone: no credentials were
-              transmitted, stored or checked, and no session was created. Sign-in will post to{" "}
-              <span className="font-mono text-xs">POST /api/auth/login</span> and issue an
-              HttpOnly session cookie once the EC2 + RDS backend exists.
+              Your account is authenticated with a secure server session. Passwords are never returned by the API.
             </p>
             <div className="flex flex-wrap gap-2">
               <ButtonLink href="/" size="sm" variant="secondary">
-                Preview student pages
+                Discover events
               </ButtonLink>
               <ButtonLink href="/dashboard" size="sm">
-                Preview organizer dashboard
+                Open dashboard
               </ButtonLink>
             </div>
             <Button
@@ -292,7 +309,7 @@ export function AuthForm() {
               label="Password"
               required
               error={errors.password}
-              hint={mode === "signup" ? "Minimum 8 characters." : undefined}
+              hint={mode === "signup" ? "Minimum 12 characters." : undefined}
               action={
                 <button
                   type="button"
@@ -385,9 +402,7 @@ export function AuthForm() {
         )}
 
         <Notice tone="warning" className="text-xs">
-          <span className="font-semibold">No fake login.</span> This form only checks the fields
-          above in your browser. Role permissions are not enforced here and must never be relied
-          on until the server-side auth milestone ships.
+          <span className="font-semibold">Secure sign-in.</span> Account roles and permissions are verified on the server for protected actions.
         </Notice>
       </div>
     </div>

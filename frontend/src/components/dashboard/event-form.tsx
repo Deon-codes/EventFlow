@@ -135,9 +135,12 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
   const [values, setValues] = useState<FormValues>(() => initialValues(event));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<null | "draft" | "publish">(null);
-  const [result, setResult] = useState<null | { status: "draft" | "published"; at: string }>(
+  const [result, setResult] = useState<null | { status: "draft" | "published"; at: string; id: string }>(
     null,
   );
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [posterMessage, setPosterMessage] = useState<string | null>(null);
+  const posterInput = useRef<HTMLInputElement>(null);
   const pendingAction = useRef<"draft" | "publish">("publish");
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
@@ -188,7 +191,7 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
     [closesAt, endsAt, event, startsAt, values],
   );
 
-  function submit(formEvent: FormEvent<HTMLFormElement>) {
+  async function submit(formEvent: FormEvent<HTMLFormElement>) {
     formEvent.preventDefault();
     const action = pendingAction.current;
     const nextErrors = validate(values);
@@ -199,16 +202,38 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
     }
 
     setSubmitting(action);
-    window.setTimeout(() => {
-      setSubmitting(null);
-      setResult({
-        status: action === "publish" ? "published" : "draft",
-        at: DEMO_TODAY,
+    setErrors({});
+    try {
+      const response = await fetch(mode === "edit" && event ? `/api/events/${event.id}` : "/api/events", {
+        method: mode === "edit" && event ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: values.title.trim(), description: values.description.trim(), category: values.category, location: values.venue.trim(), startsAt, endsAt, capacity: Number(values.capacity), status: action === "publish" ? "published" : "draft" }),
       });
-    }, 900);
+      const saved = await response.json();
+      if (!response.ok) throw new Error(saved.error ?? "The event could not be saved.");
+      setResult({ status: action === "publish" ? "published" : "draft", at: new Date().toISOString(), id: saved.id });
+    } catch (error) {
+      setErrors({ form: error instanceof Error ? error.message : "The event could not be saved." });
+    } finally { setSubmitting(null); }
   }
 
   const errorCount = Object.keys(errors).length;
+
+  async function uploadPoster() {
+    if (!posterFile || !result?.id) return;
+    setPosterMessage("Uploading poster…");
+    try {
+      const signed = await fetch(`/api/events/${result.id}/poster-upload`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: posterFile.type, size: posterFile.size }) });
+      const target = await signed.json();
+      if (!signed.ok) throw new Error(target.error ?? "Could not prepare poster upload.");
+      const uploaded = await fetch(target.uploadUrl, { method: "PUT", headers: { "Content-Type": posterFile.type }, body: posterFile });
+      if (!uploaded.ok) throw new Error("S3 rejected the poster upload. Check bucket CORS and role permissions.");
+      const saved = await fetch(`/api/events/${result.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: values.title.trim(), description: values.description.trim(), category: values.category, location: values.venue.trim(), startsAt, endsAt, capacity: Number(values.capacity), status: result.status, posterKey: target.key }) });
+      const savedResult = await saved.json();
+      if (!saved.ok) throw new Error(savedResult.error ?? "Poster uploaded but event metadata could not be saved.");
+      setPosterMessage("Poster uploaded securely to private S3 storage.");
+    } catch (error) { setPosterMessage(error instanceof Error ? error.message : "Poster upload failed."); }
+  }
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
@@ -413,7 +438,7 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
           <Card>
             <CardHeader
               title="Poster"
-              description="Pick an illustration now; S3 upload lands with the backend milestone"
+              description="Choose an illustration or upload a private event poster"
               icon={<ImagePlus className="size-4" />}
             />
             <div className="space-y-4 px-5 py-5">
@@ -454,14 +479,16 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-ink-900">Upload a poster</p>
                   <p className="text-xs text-ink-500">
-                    Available after the Amazon S3 integration — posters will upload straight from
-                    the organizer workspace.
+                    JPEG, PNG, or WebP up to 5 MB. Save the event before uploading.
                   </p>
                 </div>
-                <Button variant="secondary" size="sm" disabled icon={<Upload className="size-3.5" />}>
-                  Upload (soon)
+                <input ref={posterInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(changed) => setPosterFile(changed.target.files?.[0] ?? null)} />
+                <Button variant="secondary" size="sm" onClick={() => posterInput.current?.click()} icon={<Upload className="size-3.5" />}>
+                  {posterFile?.name ?? "Choose file"}
                 </Button>
+                {result ? <Button variant="secondary" size="sm" disabled={!posterFile} onClick={uploadPoster}>Upload poster</Button> : null}
               </div>
+              {posterMessage ? <p role="status" className="text-xs text-ink-600">{posterMessage}</p> : null}
             </div>
           </Card>
 
@@ -478,17 +505,10 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
           {result ? (
             <Notice
               tone="success"
-              title={
-                result.status === "published"
-                  ? "Publish request prepared (nothing was sent)"
-                  : "Draft staged in this browser only"
-              }
+              title={result.status === "published" ? "Event published" : "Draft saved"}
             >
               <p>
-                EventFlow has no API yet, so this form did not save anything. In the AWS
-                milestone it will POST the payload below to{" "}
-                <span className="font-mono text-xs">/api/events</span>, store the record in
-                Amazon RDS and upload the poster to Amazon S3.
+                This event is saved in PostgreSQL. Poster illustration remains a local preview; image upload is available after saving once S3 is configured.
               </p>
               <dl className="mt-3 grid gap-1.5 text-xs sm:grid-cols-2">
                 {[

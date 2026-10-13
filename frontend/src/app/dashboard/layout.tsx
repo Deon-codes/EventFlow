@@ -19,8 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <DashboardTopbar />
         <main className="flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{children}</main>
         <footer className="border-t border-cream-200 px-4 py-4 text-xs text-ink-400 sm:px-6 lg:px-8">
-          Organizer workspace · sample data only. Event storage, poster uploads and attendee
-          records connect to AWS EC2, Amazon RDS and Amazon S3 in the next milestone.
+          Event create/update and poster upload use the API. Dashboard metrics, event tables, and attendee lists still contain sample data until those pages are connected.
         </footer>
       </div>
     </div>

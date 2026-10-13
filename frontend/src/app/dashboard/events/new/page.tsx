@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, CalendarPlus } from "lucide-react";
 import { EventForm } from "@/components/dashboard/event-form";
 import { Badge } from "@/components/ui/badge";
-import { BackendNotice } from "@/components/ui/notice";
+import { Notice } from "@/components/ui/notice";
 
 export const metadata: Metadata = {
   title: "Create event",
@@ -36,11 +36,10 @@ export default function CreateEventPage() {
         </div>
       </header>
 
-      <BackendNotice endpoint="POST /api/events">
-        Validation, the live preview and the poster picker all work in the browser. Saving a
-        draft or publishing only stages the payload locally until the RDS-backed events API
-        exists.
-      </BackendNotice>
+      <Notice tone="info" title="Live event editor">
+        Saving or publishing writes to PostgreSQL and requires a signed-in organizer. Poster
+        uploads use short-lived private S3 URLs after the event is saved.
+      </Notice>
 
       <EventForm mode="create" />
     </div>

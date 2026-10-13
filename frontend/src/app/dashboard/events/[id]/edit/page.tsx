@@ -5,9 +5,13 @@ import { ArrowLeft, Pencil, Users } from "lucide-react";
 import { EventForm } from "@/components/dashboard/event-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
-import { BackendNotice } from "@/components/ui/notice";
+import { Notice } from "@/components/ui/notice";
 import { fillRate, getEventById, registrationsForEvent } from "@/lib/events";
 import { formatDateRange } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
+import { currentUser } from "@/lib/session";
+import { toCampusEvent } from "@/lib/event-mapper";
+import { redirect, forbidden } from "next/navigation";
 
 export async function generateMetadata({
   params,
@@ -27,10 +31,19 @@ export default async function EditEventPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const event = getEventById(id);
+  let event = getEventById(id);
+  if (process.env.DATABASE_URL) {
+    const user = await currentUser();
+    if (!user) redirect("/login");
+    if (user.role !== "ORGANIZER" && user.role !== "ADMIN") forbidden();
+    const stored = await prisma.event.findUnique({ where: { id }, include: { _count: { select: { registrations: true } } } });
+    if (!stored) notFound();
+    if (stored.organizerId !== user.id && user.role !== "ADMIN") forbidden();
+    event = toCampusEvent(stored);
+  }
   if (!event) notFound();
 
-  const registrations = registrationsForEvent(event.id);
+  const registrations = process.env.DATABASE_URL ? [] : registrationsForEvent(event.id);
 
   return (
     <div className="space-y-5">
@@ -69,10 +82,9 @@ export default async function EditEventPage({
         </div>
       </header>
 
-      <BackendNotice endpoint={`PATCH /api/events/${event.id}`}>
-        Changes made here update the form state and the live preview only. Saving will patch the
-        record in Amazon RDS once the events API is connected.
-      </BackendNotice>
+      <Notice tone="info" title="Live event editor">
+        Event changes save to PostgreSQL. The organizer event table and registration count on this screen still use sample data.
+      </Notice>
 
       <EventForm mode="edit" event={event} />
     </div>

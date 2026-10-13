@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   CircleCheckBig,
@@ -41,6 +42,7 @@ export function ProfileView({
   student: CampusUser;
   stats: { tickets: number; attended: number; registeredAt: string };
 }) {
+  const router = useRouter();
   const [values, setValues] = useState({
     name: student.name,
     email: student.email,
@@ -342,12 +344,7 @@ export function ProfileView({
               variant="ghost"
               className="w-full text-berry-500 hover:bg-berry-500/10"
               icon={<LogOut className="size-4" />}
-              onClick={() =>
-                setErrors({
-                  session:
-                    "Sign-out is not wired up yet — there is no session or cookie in this milestone.",
-                })
-              }
+              onClick={async () => { const response = await fetch("/api/auth/logout", { method: "POST" }); if (response.ok) router.push("/login"); else setErrors({ session: "Sign-out failed. Please try again." }); }}
             >
               Sign out
             </Button>

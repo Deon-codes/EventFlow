@@ -4,6 +4,7 @@ import { AttendeeView } from "@/components/dashboard/attendee-view";
 import { Badge } from "@/components/ui/badge";
 import { organizerEvents, organizerSummary } from "@/lib/events";
 import { MOCK_REGISTRATIONS } from "@/lib/mock-data";
+import { BackendNotice } from "@/components/ui/notice";
 
 export const metadata: Metadata = {
   title: "Attendees",
@@ -36,6 +37,11 @@ export default async function AttendeesPage({
           students and record check-ins at the door.
         </p>
       </header>
+
+      <BackendNotice endpoint="GET /api/events/[id]/registrations">
+        This dashboard still displays sample attendee rows. The API supports organizer-scoped
+        attendee lists and check-in; this page is not connected to those responses yet.
+      </BackendNotice>
 
       <AttendeeView
         events={events}

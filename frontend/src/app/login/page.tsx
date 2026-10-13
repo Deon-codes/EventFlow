@@ -52,8 +52,7 @@ export default function LoginPage() {
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-ink-700">
             EventFlow is the Cloud Computing Lab mini-project: one place for students to find
-            events and for organizers to fill the room. This milestone ships the full frontend —
-            data is sample content until the AWS services are connected.
+            events and for organizers to fill the room. Login and registration are connected to the server API. Discovery and dashboard views still include sample content.
           </p>
 
           <div className="mt-6 h-52 sm:h-64">

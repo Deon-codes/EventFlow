@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BadgeCheck,
   BarChart3,
@@ -75,6 +75,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function RailContent({ onNavigate }: { onNavigate?: () => void }) {
+  const router = useRouter();
   return (
     <div className="flex h-full flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -134,14 +135,14 @@ function RailContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-4">
           <div className="flex items-center gap-2 text-white">
             <BadgeCheck aria-hidden="true" className="size-4" />
-            <p className="text-sm font-semibold">Cloud sync coming</p>
+            <p className="text-sm font-semibold">Event API connected</p>
           </div>
           <div className="my-3 h-20">
             <PromoArt />
           </div>
           <p className="text-xs leading-relaxed text-white/85">
-            Event data, posters and attendee lists move to Amazon RDS and Amazon S3 in the next
-            milestone.
+            Event edits and private poster uploads use the API. Dashboard metrics and attendee
+            tables still show sample records.
           </p>
         </div>
       </div>
@@ -152,14 +153,18 @@ function RailContent({ onNavigate }: { onNavigate?: () => void }) {
           <p className="truncate text-sm font-semibold text-white">{CURRENT_ORGANIZER.name}</p>
           <p className="truncate text-xs text-white/50">{CURRENT_ORGANIZER.year}</p>
         </div>
-        <Link
-          href="/login"
-          aria-label="Sign out (placeholder)"
-          title="No session exists yet"
+        <button
+          type="button"
+          aria-label="Sign out"
+          title="Sign out of EventFlow"
           className="grid size-9 place-items-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+          onClick={async () => {
+            await fetch("/api/auth/logout", { method: "POST" });
+            router.push("/login");
+          }}
         >
           <LogOut className="size-4" />
-        </Link>
+        </button>
       </div>
     </div>
   );

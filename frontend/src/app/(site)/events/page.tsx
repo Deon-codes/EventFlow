@@ -7,6 +7,11 @@ import { BackendNotice } from "@/components/ui/notice";
 import { DATE_FILTERS, allEvents, registrationsForStudent, type SortValue } from "@/lib/events";
 import { CURRENT_STUDENT } from "@/lib/mock-data";
 import { EVENT_CATEGORIES, type EventCategory } from "@/types";
+import { RegistrationStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { currentUser } from "@/lib/session";
+import { publishedEventsForUi } from "@/lib/event-mapper";
+import { Notice } from "@/components/ui/notice";
 
 export const metadata: Metadata = {
   title: "All events",
@@ -43,10 +48,23 @@ export default async function EventsPage({
       ? rawSort
       : "soonest";
 
-  const events = allEvents();
-  const registeredIds = registrationsForStudent(CURRENT_STUDENT.id).map(
-    (registration) => registration.eventId,
-  );
+  let events = allEvents();
+  let liveError: string | null = null;
+  let registeredIds = registrationsForStudent(CURRENT_STUDENT.id).map((registration) => registration.eventId);
+  if (process.env.DATABASE_URL) {
+    try {
+      events = await publishedEventsForUi();
+      const user = await currentUser();
+      if (user?.role === "STUDENT") {
+        const registrations = await prisma.registration.findMany({ where: { userId: user.id, status: { in: [RegistrationStatus.REGISTERED, RegistrationStatus.CHECKED_IN] } }, select: { eventId: true } });
+        registeredIds = registrations.map((row) => row.eventId);
+      } else registeredIds = [];
+    } catch {
+      events = [];
+      registeredIds = [];
+      liveError = "Published events could not be loaded. Please try again later.";
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -59,8 +77,7 @@ export default async function EventsPage({
             All campus events
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-ink-500">
-            Search by title, venue or tag, then narrow the list by category, date window and
-            popularity. Filters run instantly on the sample data set.
+            Search by title or venue, then narrow the list by category, date window and popularity.
           </p>
         </div>
       </header>
@@ -75,11 +92,8 @@ export default async function EventsPage({
             initialDate={dateFilter}
             initialSort={sort}
           />
-          <BackendNotice endpoint="GET /api/events?category=&from=&to=">
-            Filters and search are applied in the browser over the bundled sample events.
-            Server-side pagination and full-text search will replace them once the RDS-backed
-            API is live.
-          </BackendNotice>
+          {liveError ? <Notice tone="danger" title="Event list unavailable">{liveError}</Notice> : null}
+          {!process.env.DATABASE_URL ? <BackendNotice endpoint="GET /api/events">This local environment has no database configured, so the bundled sample events are shown.</BackendNotice> : null}
         </div>
         <StudentRail />
       </div>

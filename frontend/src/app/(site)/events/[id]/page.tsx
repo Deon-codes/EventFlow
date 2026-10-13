@@ -34,6 +34,7 @@ import {
   spotsLeft,
 } from "@/lib/events";
 import { CURRENT_ORGANIZER, CURRENT_STUDENT } from "@/lib/mock-data";
+import { publishedEventForUi } from "@/lib/event-mapper";
 import {
   formatFullDate,
   formatShortDate,
@@ -52,7 +53,10 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const event = getEventById(id);
+  let event = getEventById(id);
+  if (!event && process.env.DATABASE_URL) {
+    event = await publishedEventForUi(id) ?? undefined;
+  }
   if (!event) return { title: "Event not found" };
   return {
     title: event.title,
@@ -66,12 +70,16 @@ export default async function EventDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const event = getEventById(id);
+  let event = getEventById(id);
+  const isStoredEvent = !event && Boolean(process.env.DATABASE_URL);
+  if (!event && process.env.DATABASE_URL) {
+    event = await publishedEventForUi(id) ?? undefined;
+  }
   if (!event) notFound();
 
-  const myRegistration = registrationFor(event.id, CURRENT_STUDENT.id);
+  const myRegistration = isStoredEvent ? null : registrationFor(event.id, CURRENT_STUDENT.id);
   const related = relatedEvents(event);
-  const attendees = registrationsForEvent(event.id);
+  const attendees = isStoredEvent ? [] : registrationsForEvent(event.id);
   const soldOut = isSoldOut(event);
   const confirmed = attendees.filter((entry) => entry.status === "confirmed").length;
 
