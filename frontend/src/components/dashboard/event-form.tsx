@@ -139,6 +139,7 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
     null,
   );
   const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [posterUrl, setPosterUrl] = useState<string | undefined>(event?.posterUrl);
   const [posterMessage, setPosterMessage] = useState<string | null>(null);
   const posterInput = useRef<HTMLInputElement>(null);
   const pendingAction = useRef<"draft" | "publish">("publish");
@@ -183,12 +184,12 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
         .map((tag) => tag.trim())
         .filter(Boolean),
       featured: false,
-      posterUrl: event?.posterUrl,
+      posterUrl: posterUrl ?? event?.posterUrl,
       posterArt: values.posterArt,
       createdAt: event?.createdAt ?? DEMO_TODAY,
       highlights: [],
     }),
-    [closesAt, endsAt, event, startsAt, values],
+    [closesAt, endsAt, event, posterUrl, startsAt, values],
   );
 
   async function submit(formEvent: FormEvent<HTMLFormElement>) {
@@ -220,19 +221,47 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
   const errorCount = Object.keys(errors).length;
 
   async function uploadPoster() {
-    if (!posterFile || !result?.id) return;
+    const targetId = result?.id ?? event?.id;
+    if (!posterFile || !targetId) return;
     setPosterMessage("Uploading poster…");
     try {
-      const signed = await fetch(`/api/events/${result.id}/poster-upload`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: posterFile.type, size: posterFile.size }) });
+      const signed = await fetch(`/api/events/${targetId}/poster-upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType: posterFile.type, size: posterFile.size }),
+      });
       const target = await signed.json();
       if (!signed.ok) throw new Error(target.error ?? "Could not prepare poster upload.");
-      const uploaded = await fetch(target.uploadUrl, { method: "PUT", headers: { "Content-Type": posterFile.type }, body: posterFile });
+      const uploaded = await fetch(target.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": posterFile.type },
+        body: posterFile,
+      });
       if (!uploaded.ok) throw new Error("S3 rejected the poster upload. Check bucket CORS and role permissions.");
-      const saved = await fetch(`/api/events/${result.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: values.title.trim(), description: values.description.trim(), category: values.category, location: values.venue.trim(), startsAt, endsAt, capacity: Number(values.capacity), status: result.status, posterKey: target.key }) });
+      const currentStatus =
+        result?.status ?? (event?.status === "cancelled" ? "draft" : event?.status) ?? "published";
+      const saved = await fetch(`/api/events/${targetId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: values.title.trim(),
+          description: values.description.trim(),
+          category: values.category,
+          location: values.venue.trim(),
+          startsAt,
+          endsAt,
+          capacity: Number(values.capacity),
+          status: currentStatus,
+          posterKey: target.key,
+        }),
+      });
       const savedResult = await saved.json();
       if (!saved.ok) throw new Error(savedResult.error ?? "Poster uploaded but event metadata could not be saved.");
+      setPosterUrl(target.key);
       setPosterMessage("Poster uploaded securely to private S3 storage.");
-    } catch (error) { setPosterMessage(error instanceof Error ? error.message : "Poster upload failed."); }
+    } catch (error) {
+      setPosterMessage(error instanceof Error ? error.message : "Poster upload failed.");
+    }
   }
 
   return (
@@ -479,14 +508,14 @@ export function EventForm({ mode, event }: { mode: Mode; event?: CampusEvent }) 
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-ink-900">Upload a poster</p>
                   <p className="text-xs text-ink-500">
-                    JPEG, PNG, or WebP up to 5 MB. Save the event before uploading.
+                    JPEG, PNG, or WebP up to 5 MB.{mode === "create" && !result ? " Save the event before uploading." : ""}
                   </p>
                 </div>
                 <input ref={posterInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(changed) => setPosterFile(changed.target.files?.[0] ?? null)} />
                 <Button variant="secondary" size="sm" onClick={() => posterInput.current?.click()} icon={<Upload className="size-3.5" />}>
                   {posterFile?.name ?? "Choose file"}
                 </Button>
-                {result ? <Button variant="secondary" size="sm" disabled={!posterFile} onClick={uploadPoster}>Upload poster</Button> : null}
+                {result || (mode === "edit" && event) ? <Button variant="secondary" size="sm" disabled={!posterFile} onClick={uploadPoster}>Upload poster</Button> : null}
               </div>
               {posterMessage ? <p role="status" className="text-xs text-ink-600">{posterMessage}</p> : null}
             </div>

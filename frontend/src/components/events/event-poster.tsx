@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Boxes,
@@ -95,9 +98,9 @@ const DECOR_BY_ART: Record<PosterArt, Decor> = {
 /**
  * Event posters are illustrated placeholders in this milestone.
  *
- * The component already accepts `event.posterUrl`; once uploaded posters live in
- * Amazon S3 the real image is rendered through next/image and the illustration
- * is only used as a fallback.
+ * When `event.posterUrl` is set, the component requests a temporary signed URL
+ * from `/api/events/:id/poster` and renders the real image through next/image.
+ * The illustration is shown while loading and as a fallback if the request fails.
  */
 export function EventPoster({
   event,
@@ -105,29 +108,61 @@ export function EventPoster({
   rounded = "rounded-3xl",
   showWordmark = true,
 }: {
-  event: Pick<CampusEvent, "category" | "posterArt" | "posterUrl" | "title">;
+  event: {
+    id?: string;
+    category: CampusEvent["category"];
+    posterArt?: CampusEvent["posterArt"];
+    posterUrl?: CampusEvent["posterUrl"] | null;
+    title: CampusEvent["title"];
+  };
   className?: string;
   rounded?: string;
   showWordmark?: boolean;
 }) {
   const tone = categoryTone(event.category).poster;
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-  if (event.posterUrl) {
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!event.id || !event.posterUrl) {
+      return;
+    }
+
+    fetch(`/api/events/${event.id}/poster`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Poster unavailable");
+        return response.json();
+      })
+      .then((data: { url?: string }) => {
+        if (!cancelled) setImageUrl(data.url ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setImageUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [event.id, event.posterUrl]);
+
+  if (event.posterUrl && imageUrl) {
     return (
       <div className={cn("relative overflow-hidden", rounded, className)}>
         <Image
-          src={event.posterUrl}
+          src={imageUrl}
           alt={`${event.title} poster`}
           fill
           sizes="(max-width: 768px) 100vw, 420px"
           className="object-cover"
+          unoptimized
         />
       </div>
     );
   }
 
-  const Icon = ART_ICONS[event.posterArt] ?? CATEGORY_ICONS[event.category];
-  const decor = DECOR_BY_ART[event.posterArt] ?? "orbit";
+  const Icon = (event.posterArt && ART_ICONS[event.posterArt]) ?? CATEGORY_ICONS[event.category];
+  const decor = (event.posterArt && DECOR_BY_ART[event.posterArt]) ?? "orbit";
 
   return (
     <div
