@@ -21,9 +21,11 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Notice } from "@/components/ui/notice";
-import { organizerEvents, organizerSummary } from "@/lib/events";
+import { organizerEvents as mockOrganizerEvents, organizerSummary } from "@/lib/events";
 import { MOCK_ACTIVITY, MOCK_REGISTRATIONS } from "@/lib/mock-data";
 import { DEMO_TODAY, daysBetween, formatDateTimeStamp, relativeDayLabel } from "@/lib/format";
+import { currentUser } from "@/lib/session";
+import { organizerWorkspaceForUi } from "@/lib/event-mapper";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -40,9 +42,14 @@ const TONE_CLASSES: Record<string, string> = {
   leaf: "bg-leaf-100 text-leaf-500",
 };
 
-export default function DashboardPage() {
-  const events = organizerEvents();
-  const summary = organizerSummary(events);
+export default async function DashboardPage() {
+  const user = await currentUser();
+  const isOrganizer = !!user && (user.role === "ORGANIZER" || user.role === "ADMIN");
+  const workspace = isOrganizer ? await organizerWorkspaceForUi(user.id) : null;
+  const useLiveData = !!workspace && workspace.events.length > 0;
+  const events = useLiveData ? workspace!.events : mockOrganizerEvents();
+  const registrations = useLiveData ? workspace!.registrations : MOCK_REGISTRATIONS;
+  const summary = organizerSummary(events, registrations);
   const upcoming = events
     .filter(
       (event) =>
@@ -168,7 +175,12 @@ export default function DashboardPage() {
             />
           </Card>
 
-          <RecentRegistrations registrations={MOCK_REGISTRATIONS} limit={6} />
+          <RecentRegistrations
+            registrations={registrations}
+            events={useLiveData ? events : undefined}
+            limit={6}
+            live={useLiveData}
+          />
         </div>
 
         <div className="space-y-6">
@@ -235,12 +247,19 @@ export default function DashboardPage() {
             </ul>
           </Card>
 
-          <Notice tone="warning" className="text-xs">
-            <span className="font-semibold">Metrics are sample-based.</span> Every number here is
-            computed from bundled mock events and registrations. The production dashboard will
-            aggregate from Amazon RDS through{" "}
-            <span className="font-mono">GET /api/organizer/summary</span>.
-          </Notice>
+          {useLiveData ? (
+            <Notice tone="info" className="text-xs">
+              <span className="font-semibold">Live workspace data.</span> Metrics, events and
+              registrations are read from your accounts. The recent activity feed is still sample
+              content until an audit log is added.
+            </Notice>
+          ) : (
+            <Notice tone="warning" className="text-xs">
+              <span className="font-semibold">Sample data.</span> You are viewing bundled demo
+              content. Sign in as an organizer to load your live events and registrations from the
+              database.
+            </Notice>
+          )}
 
           <Card className="p-5">
             <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">

@@ -6,18 +6,22 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { RegistrationStatusBadge } from "@/components/events/status-badge";
 import { getEventById } from "@/lib/events";
 import { formatDateTimeStamp } from "@/lib/format";
-import type { Registration } from "@/types";
+import type { CampusEvent, Registration } from "@/types";
 
 export function RecentRegistrations({
   registrations,
+  events,
   limit = 6,
   title = "Recent registrations",
   compact = false,
+  live = false,
 }: {
   registrations: Registration[];
+  events?: CampusEvent[];
   limit?: number;
   title?: string;
   compact?: boolean;
+  live?: boolean;
 }) {
   const latest = [...registrations]
     .sort((a, b) => b.registeredAt.localeCompare(a.registeredAt))
@@ -40,7 +44,9 @@ export function RecentRegistrations({
       />
       <ul className="divide-y divide-cream-200">
         {latest.map((registration) => {
-          const event = getEventById(registration.eventId);
+          const event =
+            events?.find((candidate) => candidate.id === registration.eventId) ??
+            getEventById(registration.eventId);
           return (
             <li
               key={registration.id}
@@ -73,7 +79,9 @@ export function RecentRegistrations({
         ) : null}
       </ul>
       <div className="border-t border-cream-200 px-5 py-3">
-        <Badge tone="outline">Sample data · resets on reload</Badge>
+        <Badge tone="outline">
+          {live ? "Live data" : "Sample data · resets on reload"}
+        </Badge>
       </div>
     </Card>
   );

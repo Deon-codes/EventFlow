@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <DashboardTopbar />
         <main className="flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{children}</main>
         <footer className="border-t border-cream-200 px-4 py-4 text-xs text-ink-400 sm:px-6 lg:px-8">
-          Event create/update and poster upload use the API. Dashboard metrics, event tables, and attendee lists still contain sample data until those pages are connected.
+          Event create/update and poster upload use the API. Signed-in organizers see live events, registrations and attendee lists; public visitors still see sample content.
         </footer>
       </div>
     </div>

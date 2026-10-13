@@ -51,7 +51,7 @@ export function AuthForm() {
     setMode("signin");
     setRole(demoRole);
     if (demoRole === "student") {
-      setEmail("student@campus.edu");
+      setEmail("maya.rodrigues@campus.edu");
       setPassword("Student@123");
     } else {
       setEmail("organizer@campus.edu");

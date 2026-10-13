@@ -320,12 +320,14 @@ export const dbService = {
       } catch {}
     }
     const store = loadLocalStore();
-    return store.events.map((e) => {
-      const regCount = store.registrations.filter(
-        (r) => r.eventId === e.id && (r.status === "REGISTERED" || r.status === "CHECKED_IN")
-      ).length;
-      return { ...e, registered: regCount };
-    });
+    return store.events
+      .filter((e) => e.organizerId === organizerId)
+      .map((e) => {
+        const regCount = store.registrations.filter(
+          (r) => r.eventId === e.id && (r.status === "REGISTERED" || r.status === "CHECKED_IN")
+        ).length;
+        return { ...e, registered: regCount };
+      });
   },
 
   async createEvent(data: {
@@ -504,6 +506,47 @@ export const dbService = {
         user: user ? { id: user.id, name: user.name, email: user.email } : { id: r.userId, name: "Student", email: "" },
       };
     });
+  },
+
+  async getOrganizerRegistrations(organizerId: string) {
+    if (await checkPrismaReachable()) {
+      try {
+        return await prisma.registration.findMany({
+          where: { event: { organizerId } },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            ticketCode: true,
+            status: true,
+            checkedInAt: true,
+            createdAt: true,
+            eventId: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        });
+      } catch {}
+    }
+    const store = loadLocalStore();
+    const eventIds = new Set(
+      store.events.filter((e) => e.organizerId === organizerId).map((e) => e.id)
+    );
+    return store.registrations
+      .filter((r) => eventIds.has(r.eventId))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((r) => {
+        const user = store.users.find((u) => u.id === r.userId);
+        return {
+          id: r.id,
+          ticketCode: r.ticketCode,
+          status: r.status,
+          checkedInAt: r.checkedInAt,
+          createdAt: r.createdAt,
+          eventId: r.eventId,
+          user: user
+            ? { id: user.id, name: user.name, email: user.email }
+            : { id: r.userId, name: "Student", email: "" },
+        };
+      });
   },
 
   async createRegistration(eventId: string, userId: string) {

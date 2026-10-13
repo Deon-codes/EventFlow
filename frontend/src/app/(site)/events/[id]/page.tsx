@@ -20,7 +20,6 @@ import { CategoryBadge, EventStatusBadge } from "@/components/events/status-badg
 import { CapacityMeter } from "@/components/ui/progress";
 import {
   allEvents,
-  fillRate,
   getEventById,
   isSoldOut,
   relatedEvents,
@@ -212,7 +211,7 @@ export default async function EventDetailPage({
                 <span className="text-slate-600">Available Capacity</span>
                 <span className="text-slate-900">{spotsLeft(event)} seats remaining</span>
               </div>
-              <CapacityMeter rate={fillRate(event)} />
+              <CapacityMeter registered={event.registered} capacity={event.capacity} />
               <p className="text-[0.7rem] text-slate-400">
                 {event.registered} / {event.capacity} seats reserved so far
               </p>

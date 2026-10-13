@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarCheck, ShieldCheck, Ticket, Users } from "lucide-react";
@@ -75,7 +76,13 @@ export default function LoginPage() {
         </section>
 
         <section className="order-1 lg:order-2">
-          <AuthForm />
+          <Suspense
+            fallback={
+              <div className="mx-auto h-[520px] w-full max-w-md animate-pulse rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/50" />
+            }
+          >
+            <AuthForm />
+          </Suspense>
         </section>
       </div>
     </main>

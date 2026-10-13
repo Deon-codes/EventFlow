@@ -6,9 +6,9 @@ import { EventForm } from "@/components/dashboard/event-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { fillRate, getEventById, registrationsForEvent } from "@/lib/events";
+import { fillRate, getEventById } from "@/lib/events";
 import { formatDateRange } from "@/lib/format";
-import { prisma } from "@/lib/prisma";
+import { dbService } from "@/lib/db-service";
 import { currentUser } from "@/lib/session";
 import { toCampusEvent } from "@/lib/event-mapper";
 import { redirect, forbidden } from "next/navigation";
@@ -31,19 +31,16 @@ export default async function EditEventPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  let event = getEventById(id);
-  if (process.env.DATABASE_URL) {
-    const user = await currentUser();
-    if (!user) redirect("/login");
-    if (user.role !== "ORGANIZER" && user.role !== "ADMIN") forbidden();
-    const stored = await prisma.event.findUnique({ where: { id }, include: { _count: { select: { registrations: true } } } });
-    if (!stored) notFound();
-    if (stored.organizerId !== user.id && user.role !== "ADMIN") forbidden();
-    event = toCampusEvent(stored);
-  }
-  if (!event) notFound();
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "ORGANIZER" && user.role !== "ADMIN") forbidden();
 
-  const registrations = process.env.DATABASE_URL ? [] : registrationsForEvent(event.id);
+  const stored = await dbService.getEventById(id);
+  if (!stored) notFound();
+  if (stored.organizerId !== user.id && user.role !== "ADMIN") forbidden();
+
+  const event = toCampusEvent(stored, stored.registered ?? 0);
+  const registrations = await dbService.getEventRegistrations(id);
 
   return (
     <div className="space-y-5">
@@ -83,7 +80,7 @@ export default async function EditEventPage({
       </header>
 
       <Notice tone="info" title="Live event editor">
-        Event changes save to PostgreSQL. The organizer event table and registration count on this screen still use sample data.
+        Event changes save to the database, and the registration count reflects live bookings.
       </Notice>
 
       <EventForm mode="edit" event={event} />

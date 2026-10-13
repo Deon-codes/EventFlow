@@ -3,8 +3,10 @@ import { ListChecks } from "lucide-react";
 import { ManageEventsView } from "@/components/dashboard/manage-events-view";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
-import { organizerEvents, organizerSummary, type SortValue } from "@/lib/events";
+import { organizerEvents as mockOrganizerEvents, organizerSummary, type SortValue } from "@/lib/events";
 import { EVENT_CATEGORIES, type EventCategory, type EventStatus } from "@/types";
+import { currentUser } from "@/lib/session";
+import { organizerWorkspaceForUi } from "@/lib/event-mapper";
 
 export const metadata: Metadata = {
   title: "Manage events",
@@ -23,8 +25,15 @@ export default async function ManageEventsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const events = organizerEvents();
-  const summary = organizerSummary(events);
+  const user = await currentUser();
+  const isOrganizer = !!user && (user.role === "ORGANIZER" || user.role === "ADMIN");
+  const workspace = isOrganizer ? await organizerWorkspaceForUi(user.id) : null;
+  const useLiveData = !!workspace && workspace.events.length > 0;
+  const events = useLiveData ? workspace!.events : mockOrganizerEvents();
+  const summary = organizerSummary(
+    events,
+    useLiveData ? workspace!.registrations : undefined,
+  );
 
   const rawStatus = first(params.status);
   const status: "all" | EventStatus =

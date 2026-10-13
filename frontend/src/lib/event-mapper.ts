@@ -1,5 +1,11 @@
 import { dbService, type StoredEvent } from "@/lib/db-service";
-import { EVENT_CATEGORIES, type CampusEvent, type EventCategory } from "@/types";
+import {
+  EVENT_CATEGORIES,
+  type CampusEvent,
+  type EventCategory,
+  type Registration,
+  type RegistrationStatus,
+} from "@/types";
 
 export function toCampusEvent(row: StoredEvent | any, activeRegistrations = row.registered ?? 0): CampusEvent {
   const category = (EVENT_CATEGORIES as readonly string[]).includes(row.category)
@@ -66,4 +72,68 @@ export async function publishedEventForUi(id: string): Promise<CampusEvent | nul
     console.error("Failed to load event by id:", err);
     return null;
   }
+}
+
+function toUiRegistrationStatus(status: string): RegistrationStatus {
+  if (status === "CHECKED_IN") return "attended";
+  if (status === "CANCELLED") return "cancelled";
+  if (status === "REGISTERED") return "confirmed";
+  return "pending";
+}
+
+/** Map a stored registration row (Prisma or local store) to the UI shape. */
+export function toUiRegistration(row: any): Registration {
+  const createdAt =
+    typeof row.createdAt === "string" ? row.createdAt : row.createdAt.toISOString();
+  const checkedInAt = row.checkedInAt
+    ? typeof row.checkedInAt === "string"
+      ? row.checkedInAt
+      : row.checkedInAt.toISOString()
+    : undefined;
+
+  return {
+    id: row.id,
+    eventId: row.eventId ?? row.event?.id ?? "",
+    studentId: row.user?.id ?? row.userId ?? "",
+    studentName: row.user?.name ?? "Student",
+    studentEmail: row.user?.email ?? "",
+    programme: "Campus member",
+    status: toUiRegistrationStatus(row.status),
+    registeredAt: createdAt,
+    ticketCode: row.ticketCode,
+    checkedInAt,
+  };
+}
+
+/** Real events owned by the signed-in organizer (DB-backed with local fallback). */
+export async function organizerEventsForUi(organizerId: string): Promise<CampusEvent[]> {
+  try {
+    const rows = await dbService.getOrganizerEvents(organizerId);
+    return rows.map((row) => toCampusEvent(row, row.registered ?? 0));
+  } catch (err) {
+    console.error("Failed to load organizer events:", err);
+    return [];
+  }
+}
+
+/** Registrations across every event the organizer owns. */
+export async function organizerRegistrationsForUi(organizerId: string): Promise<Registration[]> {
+  try {
+    const rows = await dbService.getOrganizerRegistrations(organizerId);
+    return rows.map(toUiRegistration);
+  } catch (err) {
+    console.error("Failed to load organizer registrations:", err);
+    return [];
+  }
+}
+
+/** Everything the organizer workspace needs, in one DB round trip set. */
+export async function organizerWorkspaceForUi(
+  organizerId: string
+): Promise<{ events: CampusEvent[]; registrations: Registration[] }> {
+  const [events, registrations] = await Promise.all([
+    organizerEventsForUi(organizerId),
+    organizerRegistrationsForUi(organizerId),
+  ]);
+  return { events, registrations };
 }

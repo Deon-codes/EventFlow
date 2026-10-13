@@ -77,7 +77,7 @@ export function ManageEventsView({
   function changeStatus(event: CampusEvent, next: EventStatus) {
     setOverrides((current) => ({ ...current, [event.id]: next }));
     setMessage(
-      `“${event.title}” marked as ${next} in this browser session only. Status changes will be committed with PATCH /api/events/${event.id} once the API exists.`,
+      `“${event.title}” marked as ${next} in this browser session only. Publishing status changes is not wired to PATCH /api/events/${event.id} yet.`,
     );
   }
 
