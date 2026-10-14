@@ -5,9 +5,37 @@ import { dbService } from "@/lib/db-service";
 const COOKIE = "eventflow_session";
 const TTL_SECONDS = 60 * 60 * 8;
 
+const DEFAULT_DEV_SECRET = "default_development_session_secret_at_least_32_chars";
+
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (!secret || secret.trim() === "" || secret === DEFAULT_DEV_SECRET) {
+    if (isProd) {
+      throw new Error("SESSION_SECRET must be configured with a secure key (at least 32 characters) in production.");
+    }
+    return DEFAULT_DEV_SECRET;
+  }
+
+  if (secret.length < 32) {
+    if (isProd) {
+      throw new Error("SESSION_SECRET must be at least 32 characters long in production.");
+    }
+  }
+
+  return secret;
+}
+
 function key() {
-  const secret = process.env.SESSION_SECRET || "default_development_session_secret_at_least_32_chars";
-  return new TextEncoder().encode(secret);
+  return new TextEncoder().encode(getSessionSecret());
+}
+
+export function isSecureCookie(): boolean {
+  if (process.env.COOKIE_SECURE !== undefined) {
+    return process.env.COOKIE_SECURE === "true";
+  }
+  return process.env.NODE_ENV === "production";
 }
 
 export type SessionUser = {
@@ -47,7 +75,7 @@ export async function createSession(userOrId: string | SessionUser) {
   const jar = await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: TTL_SECONDS,
@@ -58,7 +86,7 @@ export async function clearSession() {
   const jar = await cookies();
   jar.set(COOKIE, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: 0,
@@ -80,7 +108,7 @@ export async function currentUser(): Promise<SessionUser | null> {
         id: dbUser.id,
         name: dbUser.name,
         email: dbUser.email,
-        role: dbUser.role as any,
+        role: dbUser.role as SessionUser["role"],
       };
     }
 
@@ -90,7 +118,7 @@ export async function currentUser(): Promise<SessionUser | null> {
         id: payload.sub,
         name: (payload.name as string) || "Campus User",
         email: payload.email as string,
-        role: ((payload.role as string) || "STUDENT") as any,
+        role: ((payload.role as string) || "STUDENT") as SessionUser["role"],
       };
     }
     return null;

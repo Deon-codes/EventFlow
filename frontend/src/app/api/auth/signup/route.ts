@@ -58,7 +58,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ user }, { status: 201 });
   } catch (error: any) {
-    console.error("Signup error:", error);
+    console.error("Signup error:", error?.message || error);
+    if (error?.code === "P2002") {
+      return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+    }
     return NextResponse.json(
       { error: error.message || "Failed to create account. Please try again." },
       { status: 500 }

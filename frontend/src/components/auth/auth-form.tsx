@@ -1,17 +1,13 @@
 "use client";
 
-import { useState, type FormEvent, useEffect } from "react";
-import Link from "next/link";
+import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
-  CheckCircle2,
   Eye,
   EyeOff,
   GraduationCap,
-  KeyRound,
   Loader2,
-  ShieldCheck,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -25,12 +21,14 @@ export function AuthForm() {
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get("redirect");
 
-  const [mode, setMode] = useState<Mode>(
-    searchParams.get("mode") === "signup" ? "signup" : "signin"
-  );
-  const [role, setRole] = useState<Role>(
-    searchParams.get("role") === "organizer" ? "organizer" : "student"
-  );
+  const queryMode = searchParams.get("mode") === "signup" ? "signup" : "signin";
+  const queryRole = searchParams.get("role") === "organizer" ? "organizer" : "student";
+
+  const [userMode, setUserMode] = useState<Mode | null>(null);
+  const [userRole, setUserRole] = useState<Role | null>(null);
+
+  const mode = userMode ?? queryMode;
+  const role = userRole ?? queryRole;
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,14 +40,9 @@ export function AuthForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (searchParams.get("mode") === "signup") setMode("signup");
-    if (searchParams.get("role") === "organizer") setRole("organizer");
-  }, [searchParams]);
-
   function fillDemo(demoRole: "student" | "organizer") {
-    setMode("signin");
-    setRole(demoRole);
+    setUserMode("signin");
+    setUserRole(demoRole);
     if (demoRole === "student") {
       setEmail("maya.rodrigues@campus.edu");
       setPassword("Student@123");
@@ -117,15 +110,17 @@ export function AuthForm() {
         return;
       }
 
-      // Success: Route to correct dashboard or redirect URL
+      // Success: Route to correct dashboard or redirect URL based on role
       const userRole = data.user?.role;
-      if (redirectUrl) {
-        router.replace(redirectUrl);
-      } else if (userRole === "ORGANIZER" || userRole === "ADMIN") {
-        router.replace("/dashboard");
+      let target: string;
+      if (userRole === "ORGANIZER" || userRole === "ADMIN") {
+        target = redirectUrl && redirectUrl.startsWith("/dashboard") ? redirectUrl : "/dashboard";
       } else {
-        router.replace("/registrations");
+        target = redirectUrl && !redirectUrl.startsWith("/dashboard") ? redirectUrl : "/registrations";
       }
+
+      router.refresh();
+      router.replace(target);
     } catch {
       setErrors({ form: "Could not connect to the server. Please check your connection." });
       setLoading(false);
@@ -139,7 +134,7 @@ export function AuthForm() {
         <button
           type="button"
           onClick={() => {
-            setMode("signin");
+            setUserMode("signin");
             setErrors({});
           }}
           className={cn(
@@ -154,7 +149,7 @@ export function AuthForm() {
         <button
           type="button"
           onClick={() => {
-            setMode("signup");
+            setUserMode("signup");
             setErrors({});
           }}
           className={cn(
@@ -176,7 +171,7 @@ export function AuthForm() {
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => setRole("student")}
+            onClick={() => setUserRole("student")}
             className={cn(
               "flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold transition-all",
               role === "student"
@@ -189,7 +184,7 @@ export function AuthForm() {
           </button>
           <button
             type="button"
-            onClick={() => setRole("organizer")}
+            onClick={() => setUserRole("organizer")}
             className={cn(
               "flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold transition-all",
               role === "organizer"

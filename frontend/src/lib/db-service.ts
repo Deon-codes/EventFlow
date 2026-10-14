@@ -136,55 +136,38 @@ function saveLocalStore(data: StoreData) {
   }
 }
 
-let isDbReachable: boolean | null = null;
-let lastDbCheck = 0;
-
-async function checkPrismaReachable(): Promise<boolean> {
-  const now = Date.now();
-  if (isDbReachable !== null && now - lastDbCheck < 60000) {
-    return isDbReachable;
+function shouldUsePrisma(): boolean {
+  if (process.env.NODE_ENV === "production") {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL must be configured in production.");
+    }
+    return true;
   }
-  if (!process.env.DATABASE_URL) {
-    isDbReachable = false;
-    lastDbCheck = now;
+  if (process.env.USE_LOCAL_STORE === "true") {
     return false;
   }
-  try {
-    // Quick test with 1.5s timeout
-    const testPromise = prisma.$queryRaw`SELECT 1`;
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1500));
-    await Promise.race([testPromise, timeoutPromise]);
-    isDbReachable = true;
-  } catch {
-    isDbReachable = false;
-  }
-  lastDbCheck = now;
-  return isDbReachable;
+  return Boolean(process.env.DATABASE_URL);
 }
 
 export const dbService = {
   async findUserByEmail(email: string) {
     const normalized = email.trim().toLowerCase();
-    if (await checkPrismaReachable()) {
-      try {
-        return await prisma.user.findFirst({
-          where: { email: { equals: normalized, mode: "insensitive" } },
-          select: { id: true, name: true, email: true, role: true, passwordHash: true },
-        });
-      } catch {}
+    if (shouldUsePrisma()) {
+      return await prisma.user.findFirst({
+        where: { email: { equals: normalized, mode: "insensitive" } },
+        select: { id: true, name: true, email: true, role: true, passwordHash: true },
+      });
     }
     const store = loadLocalStore();
     return store.users.find((u) => u.email.toLowerCase() === normalized) || null;
   },
 
   async findUserById(id: string) {
-    if (await checkPrismaReachable()) {
-      try {
-        return await prisma.user.findUnique({
-          where: { id },
-          select: { id: true, name: true, email: true, role: true },
-        });
-      } catch {}
+    if (shouldUsePrisma()) {
+      return await prisma.user.findUnique({
+        where: { id },
+        select: { id: true, name: true, email: true, role: true },
+      });
     }
     const store = loadLocalStore();
     const u = store.users.find((u) => u.id === id);
@@ -194,18 +177,16 @@ export const dbService = {
 
   async createUser(data: { name: string; email: string; passwordHash: string; role: "STUDENT" | "ORGANIZER" }) {
     const normalized = data.email.trim().toLowerCase();
-    if (await checkPrismaReachable()) {
-      try {
-        return await prisma.user.create({
-          data: {
-            name: data.name,
-            email: normalized,
-            passwordHash: data.passwordHash,
-            role: data.role as any,
-          },
-          select: { id: true, name: true, email: true, role: true },
-        });
-      } catch {}
+    if (shouldUsePrisma()) {
+      return await prisma.user.create({
+        data: {
+          name: data.name,
+          email: normalized,
+          passwordHash: data.passwordHash,
+          role: data.role as any,
+        },
+        select: { id: true, name: true, email: true, role: true },
+      });
     }
     const store = loadLocalStore();
     if (store.users.some((u) => u.email.toLowerCase() === normalized)) {
@@ -225,32 +206,30 @@ export const dbService = {
   },
 
   async getPublishedEvents(): Promise<StoredEvent[]> {
-    if (await checkPrismaReachable()) {
-      try {
-        const events = await prisma.event.findMany({
-          where: { status: "PUBLISHED" },
-          orderBy: { startsAt: "asc" },
-        });
-        const counts = events.length
-          ? await prisma.registration.groupBy({
-              by: ["eventId"],
-              where: {
-                eventId: { in: events.map((e: any) => e.id) },
-                status: { in: ["REGISTERED", "CHECKED_IN"] },
-              },
-              _count: { eventId: true },
-            })
-          : [];
-        const byEvent = new Map(counts.map((c: any) => [c.eventId, c._count.eventId]));
-        return events.map((e: any) => ({
-          ...e,
-          startsAt: e.startsAt.toISOString(),
-          endsAt: e.endsAt.toISOString(),
-          createdAt: e.createdAt.toISOString(),
-          updatedAt: e.updatedAt.toISOString(),
-          registered: byEvent.get(e.id) ?? 0,
-        })) as StoredEvent[];
-      } catch {}
+    if (shouldUsePrisma()) {
+      const events = await prisma.event.findMany({
+        where: { status: "PUBLISHED" },
+        orderBy: { startsAt: "asc" },
+      });
+      const counts = events.length
+        ? await prisma.registration.groupBy({
+            by: ["eventId"],
+            where: {
+              eventId: { in: events.map((e: any) => e.id) },
+              status: { in: ["REGISTERED", "CHECKED_IN"] },
+            },
+            _count: { eventId: true },
+          })
+        : [];
+      const byEvent = new Map(counts.map((c: any) => [c.eventId, c._count.eventId]));
+      return events.map((e: any) => ({
+        ...e,
+        startsAt: e.startsAt.toISOString(),
+        endsAt: e.endsAt.toISOString(),
+        createdAt: e.createdAt.toISOString(),
+        updatedAt: e.updatedAt.toISOString(),
+        registered: byEvent.get(e.id) ?? 0,
+      })) as StoredEvent[];
     }
     const store = loadLocalStore();
     return store.events
@@ -264,23 +243,20 @@ export const dbService = {
   },
 
   async getEventById(id: string): Promise<StoredEvent | null> {
-    if (await checkPrismaReachable()) {
-      try {
-        const event = await prisma.event.findUnique({ where: { id } });
-        if (event) {
-          const registered = await prisma.registration.count({
-            where: { eventId: id, status: { in: ["REGISTERED", "CHECKED_IN"] } },
-          });
-          return {
-            ...event,
-            startsAt: event.startsAt.toISOString(),
-            endsAt: event.endsAt.toISOString(),
-            createdAt: event.createdAt.toISOString(),
-            updatedAt: event.updatedAt.toISOString(),
-            registered,
-          } as StoredEvent;
-        }
-      } catch {}
+    if (shouldUsePrisma()) {
+      const event = await prisma.event.findUnique({ where: { id } });
+      if (!event) return null;
+      const registered = await prisma.registration.count({
+        where: { eventId: id, status: { in: ["REGISTERED", "CHECKED_IN"] } },
+      });
+      return {
+        ...event,
+        startsAt: event.startsAt.toISOString(),
+        endsAt: event.endsAt.toISOString(),
+        createdAt: event.createdAt.toISOString(),
+        updatedAt: event.updatedAt.toISOString(),
+        registered,
+      } as StoredEvent;
     }
     const store = loadLocalStore();
     const event = store.events.find((e) => e.id === id);
@@ -292,32 +268,30 @@ export const dbService = {
   },
 
   async getOrganizerEvents(organizerId: string): Promise<StoredEvent[]> {
-    if (await checkPrismaReachable()) {
-      try {
-        const events = await prisma.event.findMany({
-          where: { organizerId },
-          orderBy: { createdAt: "desc" },
-        });
-        const counts = events.length
-          ? await prisma.registration.groupBy({
-              by: ["eventId"],
-              where: {
-                eventId: { in: events.map((e: any) => e.id) },
-                status: { in: ["REGISTERED", "CHECKED_IN"] },
-              },
-              _count: { eventId: true },
-            })
-          : [];
-        const byEvent = new Map(counts.map((c: any) => [c.eventId, c._count.eventId]));
-        return events.map((e: any) => ({
-          ...e,
-          startsAt: e.startsAt.toISOString(),
-          endsAt: e.endsAt.toISOString(),
-          createdAt: e.createdAt.toISOString(),
-          updatedAt: e.updatedAt.toISOString(),
-          registered: byEvent.get(e.id) ?? 0,
-        })) as StoredEvent[];
-      } catch {}
+    if (shouldUsePrisma()) {
+      const events = await prisma.event.findMany({
+        where: { organizerId },
+        orderBy: { createdAt: "desc" },
+      });
+      const counts = events.length
+        ? await prisma.registration.groupBy({
+            by: ["eventId"],
+            where: {
+              eventId: { in: events.map((e: any) => e.id) },
+              status: { in: ["REGISTERED", "CHECKED_IN"] },
+            },
+            _count: { eventId: true },
+          })
+        : [];
+      const byEvent = new Map(counts.map((c: any) => [c.eventId, c._count.eventId]));
+      return events.map((e: any) => ({
+        ...e,
+        startsAt: e.startsAt.toISOString(),
+        endsAt: e.endsAt.toISOString(),
+        createdAt: e.createdAt.toISOString(),
+        updatedAt: e.updatedAt.toISOString(),
+        registered: byEvent.get(e.id) ?? 0,
+      })) as StoredEvent[];
     }
     const store = loadLocalStore();
     return store.events
@@ -341,22 +315,20 @@ export const dbService = {
     status: "DRAFT" | "PUBLISHED";
     organizerId: string;
   }) {
-    if (await checkPrismaReachable()) {
-      try {
-        return await prisma.event.create({
-          data: {
-            title: data.title,
-            description: data.description,
-            category: data.category,
-            location: data.location,
-            startsAt: data.startsAt,
-            endsAt: data.endsAt,
-            capacity: data.capacity,
-            status: data.status as any,
-            organizerId: data.organizerId,
-          },
-        });
-      } catch {}
+    if (shouldUsePrisma()) {
+      return await prisma.event.create({
+        data: {
+          title: data.title,
+          description: data.description,
+          category: data.category,
+          location: data.location,
+          startsAt: data.startsAt,
+          endsAt: data.endsAt,
+          capacity: data.capacity,
+          status: data.status as any,
+          organizerId: data.organizerId,
+        },
+      });
     }
     const store = loadLocalStore();
     const newEvent: StoredEvent = {
@@ -394,14 +366,12 @@ export const dbService = {
       status: "DRAFT" | "PUBLISHED" | "CANCELLED";
     }>
   ) {
-    if (await checkPrismaReachable()) {
-      try {
-        const updateData: any = { ...data };
-        return await prisma.event.update({
-          where: { id },
-          data: updateData,
-        });
-      } catch {}
+    if (shouldUsePrisma()) {
+      const updateData: any = { ...data };
+      return await prisma.event.update({
+        where: { id },
+        data: updateData,
+      });
     }
     const store = loadLocalStore();
     const idx = store.events.findIndex((e) => e.id === id);
@@ -425,31 +395,29 @@ export const dbService = {
   },
 
   async getStudentRegistrations(userId: string) {
-    if (await checkPrismaReachable()) {
-      try {
-        return await prisma.registration.findMany({
-          where: { userId },
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            ticketCode: true,
-            status: true,
-            createdAt: true,
-            checkedInAt: true,
-            event: {
-              select: {
-                id: true,
-                title: true,
-                category: true,
-                location: true,
-                startsAt: true,
-                endsAt: true,
-                posterUrl: true,
-              },
+    if (shouldUsePrisma()) {
+      return await prisma.registration.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          ticketCode: true,
+          status: true,
+          createdAt: true,
+          checkedInAt: true,
+          event: {
+            select: {
+              id: true,
+              title: true,
+              category: true,
+              location: true,
+              startsAt: true,
+              endsAt: true,
+              posterUrl: true,
             },
           },
-        });
-      } catch {}
+        },
+      });
     }
     const store = loadLocalStore();
     const userRegs = store.registrations.filter((r) => r.userId === userId);
@@ -477,21 +445,19 @@ export const dbService = {
   },
 
   async getEventRegistrations(eventId: string) {
-    if (await checkPrismaReachable()) {
-      try {
-        return await prisma.registration.findMany({
-          where: { eventId },
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            ticketCode: true,
-            status: true,
-            checkedInAt: true,
-            createdAt: true,
-            user: { select: { id: true, name: true, email: true } },
-          },
-        });
-      } catch {}
+    if (shouldUsePrisma()) {
+      return await prisma.registration.findMany({
+        where: { eventId },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          ticketCode: true,
+          status: true,
+          checkedInAt: true,
+          createdAt: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
     }
     const store = loadLocalStore();
     const regs = store.registrations.filter((r) => r.eventId === eventId);
@@ -509,22 +475,20 @@ export const dbService = {
   },
 
   async getOrganizerRegistrations(organizerId: string) {
-    if (await checkPrismaReachable()) {
-      try {
-        return await prisma.registration.findMany({
-          where: { event: { organizerId } },
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            ticketCode: true,
-            status: true,
-            checkedInAt: true,
-            createdAt: true,
-            eventId: true,
-            user: { select: { id: true, name: true, email: true } },
-          },
-        });
-      } catch {}
+    if (shouldUsePrisma()) {
+      return await prisma.registration.findMany({
+        where: { event: { organizerId } },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          ticketCode: true,
+          status: true,
+          checkedInAt: true,
+          createdAt: true,
+          eventId: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
     }
     const store = loadLocalStore();
     const eventIds = new Set(
@@ -550,35 +514,31 @@ export const dbService = {
   },
 
   async createRegistration(eventId: string, userId: string) {
-    if (await checkPrismaReachable()) {
-      try {
-        return await prisma.$transaction(async (tx: any) => {
-          const event = await tx.event.findUnique({ where: { id: eventId } });
-          if (!event || event.status !== "PUBLISHED") throw new Error("Event is not open for registration.");
-          const existing = await tx.registration.findUnique({
-            where: { userId_eventId: { userId, eventId } },
-          });
-          if (existing && existing.status !== "CANCELLED") throw new Error("You are already registered.");
-          const count = await tx.registration.count({
-            where: { eventId, status: { in: ["REGISTERED", "CHECKED_IN"] } },
-          });
-          if (count >= event.capacity) throw new Error("This event is full.");
+    if (shouldUsePrisma()) {
+      return await prisma.$transaction(async (tx: any) => {
+        const event = await tx.event.findUnique({ where: { id: eventId } });
+        if (!event || event.status !== "PUBLISHED") throw new Error("Event is not open for registration.");
+        const existing = await tx.registration.findUnique({
+          where: { userId_eventId: { userId, eventId } },
+        });
+        if (existing && existing.status !== "CANCELLED") throw new Error("You are already registered.");
+        const count = await tx.registration.count({
+          where: { eventId, status: { in: ["REGISTERED", "CHECKED_IN"] } },
+        });
+        if (count >= event.capacity) throw new Error("This event is full.");
 
-          if (existing) {
-            return tx.registration.update({
-              where: { id: existing.id },
-              data: { status: "REGISTERED", checkedInAt: null },
-              select: { id: true, eventId: true, ticketCode: true, status: true, createdAt: true },
-            });
-          }
-          return tx.registration.create({
-            data: { eventId, userId },
+        if (existing) {
+          return tx.registration.update({
+            where: { id: existing.id },
+            data: { status: "REGISTERED", checkedInAt: null },
             select: { id: true, eventId: true, ticketCode: true, status: true, createdAt: true },
           });
+        }
+        return tx.registration.create({
+          data: { eventId, userId },
+          select: { id: true, eventId: true, ticketCode: true, status: true, createdAt: true },
         });
-      } catch (err: any) {
-        if (err.message) throw err;
-      }
+      });
     }
 
     const store = loadLocalStore();
@@ -621,14 +581,13 @@ export const dbService = {
   },
 
   async cancelRegistration(registrationId: string, userId: string) {
-    if (await checkPrismaReachable()) {
-      try {
-        const res = await prisma.registration.updateMany({
-          where: { id: registrationId, userId, status: "REGISTERED" },
-          data: { status: "CANCELLED" },
-        });
-        if (res.count > 0) return { ok: true };
-      } catch {}
+    if (shouldUsePrisma()) {
+      const res = await prisma.registration.updateMany({
+        where: { id: registrationId, userId, status: "REGISTERED" },
+        data: { status: "CANCELLED" },
+      });
+      if (res.count > 0) return { ok: true };
+      throw new Error("Active registration not found.");
     }
     const store = loadLocalStore();
     const reg = store.registrations.find((r) => r.id === registrationId && r.userId === userId);
@@ -639,13 +598,11 @@ export const dbService = {
   },
 
   async checkInRegistration(registrationId: string, eventId: string) {
-    if (await checkPrismaReachable()) {
-      try {
-        return await prisma.registration.update({
-          where: { id: registrationId },
-          data: { status: "CHECKED_IN", checkedInAt: new Date() },
-        });
-      } catch {}
+    if (shouldUsePrisma()) {
+      return await prisma.registration.update({
+        where: { id: registrationId },
+        data: { status: "CHECKED_IN", checkedInAt: new Date() },
+      });
     }
     const store = loadLocalStore();
     const reg = store.registrations.find((r) => r.id === registrationId && r.eventId === eventId);
