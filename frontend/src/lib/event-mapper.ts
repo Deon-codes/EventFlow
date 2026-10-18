@@ -12,14 +12,11 @@ export function toCampusEvent(row: StoredEvent | any, activeRegistrations = row.
     ? (row.category as EventCategory)
     : "Technology";
 
-  const endsDate = new Date(row.endsAt);
   const status =
     row.status === "DRAFT" || row.status === "draft"
       ? "draft"
       : row.status === "CANCELLED" || row.status === "cancelled"
       ? "cancelled"
-      : endsDate < new Date()
-      ? "completed"
       : "published";
 
   const startsIso = typeof row.startsAt === "string" ? row.startsAt : row.startsAt.toISOString();

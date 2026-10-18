@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, Check } from "lucide-react";
 import { DashboardHeroArt } from "@/components/illustrations/illustrations";
-import { CURRENT_ORGANIZER } from "@/lib/mock-data";
 
 /** Reference A's amber greeting band with the checklist copy and illustration. */
 export function DashboardHero({
@@ -10,14 +9,16 @@ export function DashboardHero({
   nextEventTitle,
   nextEventWhen,
   openTasks,
+  organizerName,
 }: {
   upcomingCount: number;
   draftCount: number;
   nextEventTitle?: string;
   nextEventWhen?: string;
   openTasks: Array<{ label: string; done: boolean }>;
+  organizerName: string;
 }) {
-  const greeting = CURRENT_ORGANIZER.name.split(" ")[0];
+  const greeting = organizerName.split(" ")[0];
 
   return (
     <section className="overflow-hidden rounded-panel bg-gradient-to-r from-brand-500 to-brand-600 p-6 shadow-soft sm:p-7">

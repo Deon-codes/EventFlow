@@ -364,6 +364,7 @@ export const dbService = {
       endsAt: Date;
       capacity: number;
       status: "DRAFT" | "PUBLISHED" | "CANCELLED";
+      posterUrl: string;
     }>
   ) {
     if (shouldUsePrisma()) {
@@ -387,6 +388,7 @@ export const dbService = {
       ...(data.endsAt !== undefined && { endsAt: data.endsAt.toISOString() }),
       ...(data.capacity !== undefined && { capacity: data.capacity }),
       ...(data.status !== undefined && { status: data.status }),
+      ...(data.posterUrl !== undefined && { posterUrl: data.posterUrl }),
       updatedAt: new Date().toISOString(),
     };
     store.events[idx] = updated;

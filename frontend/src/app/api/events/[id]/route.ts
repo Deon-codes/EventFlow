@@ -47,6 +47,7 @@ export async function PATCH(request: Request, { params }: Context) {
   const endsAt = typeof input.endsAt === "string" ? new Date(input.endsAt) : undefined;
   const capacity = typeof input.capacity === "number" ? input.capacity : undefined;
   const status = input.status === "published" ? "PUBLISHED" : input.status === "draft" ? "DRAFT" : undefined;
+  const posterUrl = typeof input.posterKey === "string" && input.posterKey.trim() ? input.posterKey.trim() : undefined;
 
   try {
     const existing = await dbService.getEventById(id);
@@ -64,6 +65,7 @@ export async function PATCH(request: Request, { params }: Context) {
       endsAt,
       capacity,
       status,
+      posterUrl,
     });
     return NextResponse.json(updated);
   } catch (error: any) {

@@ -101,6 +101,7 @@ export default async function DashboardPage() {
         nextEventTitle={nextEvent?.title}
         nextEventWhen={nextEvent ? relativeDayLabel(nextEvent.startsAt) : undefined}
         openTasks={openTasks}
+        organizerName={user?.name ?? "Organizer"}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
