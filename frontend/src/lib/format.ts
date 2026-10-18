@@ -36,11 +36,13 @@ const WEEKDAYS = [
  *  for the server clock once events come from Amazon RDS. */
 export const DEMO_TODAY = "2026-10-12T09:00:00";
 
-export function parseCampusDate(iso: string): Date {
+export function parseCampusDate(iso: string | Date): Date {
+  if (iso instanceof Date) return iso;
+  if (!iso || typeof iso !== "string") return new Date();
   const [datePart, timePart = "00:00"] = iso.split("T");
   const [year, month, day] = datePart.split("-").map(Number);
-  const [hour, minute] = timePart.split(":").map(Number);
-  return new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const [hour = 0, minute = 0] = timePart.replace("Z", "").split(":").map(Number);
+  return new Date(Date.UTC(year, (month || 1) - 1, day || 1, hour || 0, minute || 0));
 }
 
 function parts(iso: string) {

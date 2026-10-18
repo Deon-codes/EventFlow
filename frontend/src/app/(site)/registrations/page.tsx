@@ -1,17 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import {
-  CalendarDays,
-  Compass,
-  QrCode,
-  Ticket,
-  User,
-  XCircle,
-} from "lucide-react";
+import { Compass, Ticket, User } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { dbService } from "@/lib/db-service";
-import { allEvents } from "@/lib/events";
 import { MyTicketsView } from "@/components/student/my-tickets-view";
 
 export const metadata: Metadata = {
@@ -25,8 +17,46 @@ export default async function RegistrationsPage() {
     redirect("/login?redirect=/registrations");
   }
 
-  const registrations = await dbService.getStudentRegistrations(user.id);
-  const events = await dbService.getPublishedEvents();
+  if (user.role === "ORGANIZER" || user.role === "ADMIN") {
+    redirect("/dashboard");
+  }
+
+  let rawRegistrations: any[] = [];
+  try {
+    rawRegistrations = await dbService.getStudentRegistrations(user.id);
+  } catch {
+    rawRegistrations = [];
+  }
+
+  const registrations = (rawRegistrations || []).map((r: any) => ({
+    id: r.id,
+    ticketCode: r.ticketCode,
+    status: r.status,
+    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || ""),
+    checkedInAt:
+      r.checkedInAt instanceof Date
+        ? r.checkedInAt.toISOString()
+        : r.checkedInAt
+        ? String(r.checkedInAt)
+        : null,
+    event: r.event
+      ? {
+          id: r.event.id,
+          title: r.event.title,
+          category: r.event.category,
+          location: r.event.location,
+          startsAt:
+            r.event.startsAt instanceof Date
+              ? r.event.startsAt.toISOString()
+              : String(r.event.startsAt || ""),
+          endsAt:
+            r.event.endsAt instanceof Date
+              ? r.event.endsAt.toISOString()
+              : String(r.event.endsAt || ""),
+          posterUrl: r.event.posterUrl,
+        }
+      : undefined,
+  }));
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">

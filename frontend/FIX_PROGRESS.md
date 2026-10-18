@@ -140,3 +140,48 @@ Implementation will not proceed until these are confirmed.
 1. **Organizer completedEvents count** — always 0 for DB-backed workspace data. Acceptable since "completed" was never a real DB concept.
 2. **Poster upload S3 PUT** — depends on bucket CORS and IAM role; the code fix enables the key to be saved, but network-layer prerequisites are unverified.
 3. **DashboardHero fallback** — safe; fallback "Organizer" only fires if `user` is null (impossible in practice past the auth gate).
+
+---
+
+## Session 2: Strict Frontend Bug-Fixes (Issues 1 – 4)
+
+### Issue 1: Registration Page (`/registrations`) Does Not Load Correctly
+- **Root Cause**:
+  1. `getStudentRegistrations()` from Prisma returned raw JavaScript `Date` instances (`createdAt`, `checkedInAt`, `event.startsAt`, `event.endsAt`). Passing these across the Server Component boundary into `<MyTicketsView />` caused `formatFullDate` / `parseCampusDate` to call `iso.split("T")`, throwing a runtime `TypeError: iso.split is not a function`.
+  2. If an organizer visited `/registrations`, they were shown the student ticket wallet without a role-appropriate redirect, contradicting `auth-form.js` which routes organizers to `/dashboard`.
+  3. No error boundary or safe fallback existed if registration queries threw transient database errors.
+- **Files Modified**:
+  - `src/lib/format.ts`: `parseCampusDate()` now safely accepts `Date | string` without throwing on Date instances.
+  - `src/app/(site)/registrations/page.tsx`: Role guard added (`redirect("/dashboard")` for organizers/admins); query wrapped in try/catch; dates explicitly serialized to ISO strings.
+  - `src/components/student/my-tickets-view.tsx`: Added `initialRegistrations || []` fallback.
+
+### Issue 2: Incorrect Organizer Name
+- **Root Cause**:
+  - `DashboardTopbar` and `DashboardSidebar` still imported `CURRENT_ORGANIZER` from `mock-data.ts` and hardcoded `"Amara Okafor"`.
+- **Files Modified**:
+  - `src/components/layout/dashboard-topbar.tsx`: Removed `CURRENT_ORGANIZER` import; accepted `organizer` prop; displays real user name and role.
+  - `src/components/layout/dashboard-sidebar.tsx`: Removed `CURRENT_ORGANIZER` import; accepted `organizer` prop; displays real user name and email.
+  - `src/app/dashboard/layout.tsx`: Fetches authenticated `user = await currentUser()`, validates role, and passes organizer details to topbar and sidebar.
+
+### Issue 3: Student and Organizer Dashboards Appear Identical
+- **Root Cause**:
+  - `/dashboard` had no auth or role gate; students visiting `/dashboard` were served the organizer dashboard with organizer-only actions ("Create event", "Attendees", draft tables).
+  - Profile actions offered "Open organizer dashboard" unconditionally to students.
+  - Navigation showed student-specific "My Tickets" to organizers and organizer links to students.
+- **Files Modified**:
+  - `src/app/dashboard/layout.tsx` & `src/app/dashboard/page.tsx`: Added authentication and student role guards (redirecting unauthenticated users to `/login?redirect=/dashboard` and students to `/registrations`).
+  - `src/components/layout/site-header.tsx`: Desktop nav, user dropdown, and mobile drawer show "Dashboard" to organizers and "My Tickets" to students.
+  - `src/components/student/profile-view.tsx`: Students only see "Review my tickets"; organizers only see "Open organizer dashboard".
+
+### Issue 4: Incorrect Email and Profile Details
+- **Root Cause**:
+  - `ProfilePage` synthesized mock student identities (`studentId: "STU-..."`, `programme: "Computer Science & Engineering"`, `year: "3rd Year"`, phone: `"+91 98765 43210"`) and student ticket counts for organizers.
+  - Profile validation forced campus email regex validation and required a student ID even for organizers.
+- **Files Modified**:
+  - `src/app/(site)/profile/page.tsx`: Distinct data models for student vs organizer profiles; removed fake student IDs and mock phone numbers.
+  - `src/components/student/profile-view.tsx`: Organizers receive "Organizer account" badge; student-specific fields (Student ID, Programme, Year, ticket stats) are hidden; email validation accepts standard emails without assuming campus domains.
+
+### Verification Performed
+- `node scripts/verify-auth.js`: 10/10 passed.
+- `npx tsc --noEmit`: 0 errors (clean exit code 0).
+- `npm run build`: All 34 Next.js routes built and statically/dynamically generated successfully (exit code 0).

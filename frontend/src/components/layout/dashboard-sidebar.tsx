@@ -19,7 +19,6 @@ import {
 import { BrandLogo } from "@/components/layout/brand-logo";
 import { Avatar } from "@/components/ui/avatar";
 import { PromoArt } from "@/components/illustrations/illustrations";
-import { CURRENT_ORGANIZER } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -74,8 +73,16 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function RailContent({ onNavigate }: { onNavigate?: () => void }) {
+function RailContent({
+  organizer,
+  onNavigate,
+}: {
+  organizer?: { name: string; email: string; role?: string };
+  onNavigate?: () => void;
+}) {
   const router = useRouter();
+  const name = organizer?.name || "Organizer";
+  const roleLabel = organizer?.role === "ADMIN" ? "Administrator" : "Organizer";
   return (
     <div className="flex h-full flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -148,10 +155,10 @@ function RailContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="flex items-center gap-3 rounded-2xl bg-bark-800 p-3">
-        <Avatar name={CURRENT_ORGANIZER.name} tone={CURRENT_ORGANIZER.avatarTone} />
+        <Avatar name={name} tone="brand" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">{CURRENT_ORGANIZER.name}</p>
-          <p className="truncate text-xs text-white/50">{CURRENT_ORGANIZER.year}</p>
+          <p className="truncate text-sm font-semibold text-white">{name}</p>
+          <p className="truncate text-xs text-white/50">{organizer?.email || roleLabel}</p>
         </div>
         <button
           type="button"
@@ -171,13 +178,17 @@ function RailContent({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 /** Reference A's dark navigation rail with the amber highlight bar. */
-export function DashboardSidebar() {
+export function DashboardSidebar({
+  organizer,
+}: {
+  organizer?: { name: string; email: string; role?: string };
+}) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 bg-bark-900 p-5 shadow-rail lg:block">
-        <RailContent />
+        <RailContent organizer={organizer} />
       </aside>
 
       <button
@@ -198,7 +209,7 @@ export function DashboardSidebar() {
             className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm"
           />
           <div className="absolute inset-y-0 left-0 w-[86%] max-w-sm bg-bark-900 p-5 shadow-rail">
-            <RailContent onNavigate={() => setOpen(false)} />
+            <RailContent organizer={organizer} onNavigate={() => setOpen(false)} />
           </div>
         </div>
       ) : null}

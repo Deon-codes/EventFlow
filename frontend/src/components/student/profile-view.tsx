@@ -43,6 +43,7 @@ export function ProfileView({
   stats: { tickets: number; attended: number; registeredAt: string };
 }) {
   const router = useRouter();
+  const isOrganizer = student.role === "organizer";
   const [values, setValues] = useState({
     name: student.name,
     email: student.email,
@@ -77,10 +78,11 @@ export function ProfileView({
     const nextErrors: Record<string, string> = {};
     if (!values.name.trim()) nextErrors.name = "A display name is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(values.email))
-      nextErrors.email = "Enter a valid campus email address.";
+      nextErrors.email = "Enter a valid email address.";
     if (values.phone && values.phone.replace(/\D/g, "").length < 7)
       nextErrors.phone = "That phone number looks too short.";
-    if (!values.studentId.trim()) nextErrors.studentId = "Your student ID is required.";
+    if (!isOrganizer && !values.studentId.trim())
+      nextErrors.studentId = "Your student ID is required.";
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -98,13 +100,15 @@ export function ProfileView({
             <div className="min-w-0">
               <h2 className="text-xl font-bold text-ink-900">{values.name}</h2>
               <p className="text-sm text-ink-500">
-                {values.programme} · {values.year}
+                {isOrganizer ? values.email : `${values.programme} · ${values.year}`}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge tone="brand" icon={<GraduationCap className="size-3.5" />}>
-                  Student account
+                <Badge tone="brand" icon={isOrganizer ? <ShieldCheck className="size-3.5" /> : <GraduationCap className="size-3.5" />}>
+                  {isOrganizer ? "Organizer account" : "Student account"}
                 </Badge>
-                <Badge tone="outline">{values.studentId}</Badge>
+                {!isOrganizer && values.studentId ? (
+                  <Badge tone="outline">{values.studentId}</Badge>
+                ) : null}
               </div>
             </div>
             <div className="ml-auto flex gap-2">
@@ -118,16 +122,30 @@ export function ProfileView({
             </div>
           </div>
 
-          <dl className="grid gap-4 border-t border-cream-200 px-6 py-5 sm:grid-cols-3">
-            {[
-              { label: "Tickets this semester", value: stats.tickets, icon: Sparkles },
-              { label: "Events attended", value: stats.attended, icon: CircleCheckBig },
-              {
-                label: "Member since",
-                value: formatShortDate(stats.registeredAt),
-                icon: ShieldCheck,
-              },
-            ].map((item) => (
+          <dl className={`grid gap-4 border-t border-cream-200 px-6 py-5 ${isOrganizer ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+            {(isOrganizer
+              ? [
+                  {
+                    label: "Account role",
+                    value: "Event Organizer",
+                    icon: Sparkles,
+                  },
+                  {
+                    label: "Member since",
+                    value: formatShortDate(stats.registeredAt),
+                    icon: ShieldCheck,
+                  },
+                ]
+              : [
+                  { label: "Tickets this semester", value: stats.tickets, icon: Sparkles },
+                  { label: "Events attended", value: stats.attended, icon: CircleCheckBig },
+                  {
+                    label: "Member since",
+                    value: formatShortDate(stats.registeredAt),
+                    icon: ShieldCheck,
+                  },
+                ]
+            ).map((item) => (
               <div key={item.label} className="rounded-2xl bg-cream-100 px-4 py-3">
                 <item.icon aria-hidden="true" className="size-4 text-brand-600" />
                 <dd className="mt-1.5 text-lg font-semibold text-ink-900">{item.value}</dd>
@@ -154,7 +172,7 @@ export function ProfileView({
                     onChange={(event) => update("name", event.target.value)}
                   />
                 </Field>
-                <Field id="profile-email" label="Campus email" required error={errors.email}>
+                <Field id="profile-email" label={isOrganizer ? "Email address" : "Campus email"} required error={errors.email}>
                   <Input
                     id="profile-email"
                     type="email"
@@ -171,40 +189,44 @@ export function ProfileView({
                     onChange={(event) => update("phone", event.target.value)}
                   />
                 </Field>
-                <Field id="profile-student-id" label="Student ID" required error={errors.studentId}>
-                  <Input
-                    id="profile-student-id"
-                    value={values.studentId}
-                    invalid={Boolean(errors.studentId)}
-                    onChange={(event) => update("studentId", event.target.value)}
-                  />
-                </Field>
-                <Field id="profile-programme" label="Programme">
-                  <Select
-                    id="profile-programme"
-                    value={values.programme}
-                    onChange={(event) => update("programme", event.target.value)}
-                  >
-                    {[...new Set([values.programme, ...PROGRAMS])].map((programme) => (
-                      <option key={programme} value={programme}>
-                        {programme}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field id="profile-year" label="Year">
-                  <Select
-                    id="profile-year"
-                    value={values.year}
-                    onChange={(event) => update("year", event.target.value)}
-                  >
-                    {YEARS.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
+                {!isOrganizer ? (
+                  <>
+                    <Field id="profile-student-id" label="Student ID" required error={errors.studentId}>
+                      <Input
+                        id="profile-student-id"
+                        value={values.studentId}
+                        invalid={Boolean(errors.studentId)}
+                        onChange={(event) => update("studentId", event.target.value)}
+                      />
+                    </Field>
+                    <Field id="profile-programme" label="Programme">
+                      <Select
+                        id="profile-programme"
+                        value={values.programme}
+                        onChange={(event) => update("programme", event.target.value)}
+                      >
+                        {[...new Set([values.programme, ...PROGRAMS])].map((programme) => (
+                          <option key={programme} value={programme}>
+                            {programme}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field id="profile-year" label="Year">
+                      <Select
+                        id="profile-year"
+                        value={values.year}
+                        onChange={(event) => update("year", event.target.value)}
+                      >
+                        {YEARS.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  </>
+                ) : null}
               </div>
 
               {saveState === "saved" ? (
@@ -324,22 +346,25 @@ export function ProfileView({
             icon={<Users className="size-4" />}
           />
           <div className="space-y-3 px-5 py-5">
-            <ButtonLink
-              href="/dashboard"
-              variant="secondary"
-              className="w-full"
-              icon={<Sparkles className="size-4" />}
-            >
-              Open organizer dashboard
-            </ButtonLink>
-            <ButtonLink
-              href="/registrations"
-              variant="secondary"
-              className="w-full"
-              icon={<CreditCard className="size-4" />}
-            >
-              Review my tickets
-            </ButtonLink>
+            {isOrganizer ? (
+              <ButtonLink
+                href="/dashboard"
+                variant="secondary"
+                className="w-full"
+                icon={<Sparkles className="size-4" />}
+              >
+                Open organizer dashboard
+              </ButtonLink>
+            ) : (
+              <ButtonLink
+                href="/registrations"
+                variant="secondary"
+                className="w-full"
+                icon={<CreditCard className="size-4" />}
+              >
+                Review my tickets
+              </ButtonLink>
+            )}
             <Button
               variant="ghost"
               className="w-full text-berry-500 hover:bg-berry-500/10"

@@ -6,12 +6,17 @@ import { useRouter } from "next/navigation";
 import { Bell, CalendarPlus, ChevronDown, Search } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { ButtonLink } from "@/components/ui/button";
-import { CURRENT_ORGANIZER } from "@/lib/mock-data";
 
 /** Reference A's workspace top bar. */
-export function DashboardTopbar() {
+export function DashboardTopbar({
+  organizer,
+}: {
+  organizer?: { name: string; email: string; role?: string };
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const name = organizer?.name || "Organizer";
+  const roleLabel = organizer?.role === "ADMIN" ? "Administrator" : "Event Organizer";
 
   return (
     <div className="sticky top-0 z-30 border-b border-cream-200 bg-cloud-100/95 backdrop-blur">
@@ -71,13 +76,13 @@ export function DashboardTopbar() {
             href="/profile"
             className="flex items-center gap-2.5 rounded-full border border-cream-200 bg-white py-1.5 pl-1.5 pr-3 shadow-soft transition-colors hover:border-brand-300"
           >
-            <Avatar name={CURRENT_ORGANIZER.name} tone={CURRENT_ORGANIZER.avatarTone} size="sm" />
+            <Avatar name={name} tone="brand" size="sm" />
             <span className="hidden leading-tight sm:block">
               <span className="block text-sm font-semibold text-ink-900">
-                {CURRENT_ORGANIZER.name}
+                {name}
               </span>
               <span className="block text-[0.68rem] text-ink-500">
-                {CURRENT_ORGANIZER.year}
+                {roleLabel}
               </span>
             </span>
             <ChevronDown aria-hidden="true" className="size-4 text-ink-400" />

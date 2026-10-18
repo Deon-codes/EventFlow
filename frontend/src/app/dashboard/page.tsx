@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
   CalendarClock,
@@ -44,7 +45,15 @@ const TONE_CLASSES: Record<string, string> = {
 
 export default async function DashboardPage() {
   const user = await currentUser();
-  const isOrganizer = !!user && (user.role === "ORGANIZER" || user.role === "ADMIN");
+  if (!user) {
+    redirect("/login?redirect=/dashboard");
+  }
+
+  if (user.role === "STUDENT") {
+    redirect("/registrations");
+  }
+
+  const isOrganizer = user.role === "ORGANIZER" || user.role === "ADMIN";
   const workspace = isOrganizer ? await organizerWorkspaceForUi(user.id) : null;
   const useLiveData = !!workspace && workspace.events.length > 0;
   const events = useLiveData ? workspace!.events : mockOrganizerEvents();

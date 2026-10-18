@@ -16,32 +16,45 @@ export default async function ProfilePage() {
     redirect("/login?redirect=/profile");
   }
 
-  const registrations = await dbService.getStudentRegistrations(user.id);
-  const activeCount = registrations.filter((r) => r.status === "REGISTERED").length;
-  const attendedCount = registrations.filter((r) => r.status === "CHECKED_IN").length;
+  const isOrganizer = user.role === "ORGANIZER" || user.role === "ADMIN";
+  let activeCount = 0;
+  let attendedCount = 0;
+
+  if (!isOrganizer) {
+    try {
+      const registrations = await dbService.getStudentRegistrations(user.id);
+      activeCount = registrations.filter((r) => r.status === "REGISTERED").length;
+      attendedCount = registrations.filter((r) => r.status === "CHECKED_IN").length;
+    } catch {
+      activeCount = 0;
+      attendedCount = 0;
+    }
+  }
 
   const studentObj = {
     id: user.id,
     name: user.name,
     email: user.email,
-    role: user.role.toLowerCase() as any,
-    programme: "Computer Science & Engineering",
-    year: "3rd Year",
-    studentId: `STU-${user.id.slice(-6).toUpperCase()}`,
-    phone: "+91 98765 43210",
-    avatarTone: "berry" as any,
+    role: isOrganizer ? ("organizer" as const) : ("student" as const),
+    programme: isOrganizer ? "Event Organizer" : "Computer Science & Engineering",
+    year: isOrganizer ? "Organizer" : "3rd Year",
+    studentId: isOrganizer ? undefined : "",
+    phone: "",
+    avatarTone: "berry" as const,
   };
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
       <header className="border-b border-slate-200 pb-4">
         <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
-          <User className="size-3.5" />
-          Campus {user.role === "STUDENT" ? "Student Account" : "Organizer Account"}
+          {isOrganizer ? <ShieldCheck className="size-3.5" /> : <User className="size-3.5" />}
+          Campus {isOrganizer ? "Organizer Account" : "Student Account"}
         </div>
         <h1 className="mt-2 text-3xl font-extrabold text-slate-900">Account Profile</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Manage your personal details, student identification, and event notifications.
+          {isOrganizer
+            ? "Manage your organizer details, account contact, and event preferences."
+            : "Manage your personal details, student identification, and event notifications."}
         </p>
       </header>
 

@@ -42,7 +42,7 @@ export function MyTicketsView({
   studentName: string;
   studentEmail: string;
 }) {
-  const [registrations, setRegistrations] = useState<RegistrationItem[]>(initialRegistrations);
+  const [registrations, setRegistrations] = useState<RegistrationItem[]>(initialRegistrations || []);
   const [filter, setFilter] = useState<"all" | "active" | "attended" | "cancelled">("all");
   const [activeTicketModal, setActiveTicketModal] = useState<RegistrationItem | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
