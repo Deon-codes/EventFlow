@@ -7,7 +7,7 @@ import { dbService } from "@/lib/db-service";
 
 export const metadata: Metadata = {
   title: "Profile",
-  description: "Your EventFlow account, student details and preferences.",
+  description: "Your Kampus account, student details and preferences.",
 };
 
 export default async function ProfilePage() {

@@ -298,7 +298,7 @@ export function MyTicketsView({
 
             <div className="text-center">
               <span className="inline-block rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700">
-                EventFlow E-Ticket
+                Kampus E-Ticket
               </span>
               <h3 className="mt-3 text-lg font-bold text-slate-900 leading-snug">
                 {activeTicketModal.event?.title || "Campus Event"}

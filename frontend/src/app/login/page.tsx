@@ -8,7 +8,7 @@ import { BrandLogo } from "@/components/layout/brand-logo";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to EventFlow as a student or an event organizer.",
+  description: "Sign in to Kampus as a student or an event organizer.",
 };
 
 const HIGHLIGHTS = [
@@ -52,7 +52,7 @@ export default function LoginPage() {
             Ticketing that runs on the campus cloud
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-ink-700">
-            EventFlow is the Cloud Computing Lab mini-project: one place for students to find
+            Kampus is the Cloud Computing Lab mini-project: one place for students to find
             events and for organizers to fill the room. Login and registration are connected to the server API. Discovery and dashboard views still include sample content.
           </p>
 

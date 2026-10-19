@@ -232,7 +232,7 @@ export function EventPoster({
 
       {showWordmark ? (
         <span className="absolute bottom-3 left-4 text-[0.6rem] font-bold uppercase tracking-[0.28em] opacity-45" style={{ color: tone.ink }}>
-          EventFlow
+          Kampus
         </span>
       ) : null}
     </div>

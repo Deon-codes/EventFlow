@@ -384,7 +384,7 @@ export function ProfileView({
         <Card>
           <CardHeader
             title="Privacy & data"
-            description="What EventFlow will store about you"
+            description="What Kampus will store about you"
             icon={<ShieldCheck className="size-4" />}
           />
           <ul className="space-y-3 px-5 py-5 text-sm text-ink-500">

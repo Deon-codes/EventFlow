@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Ticket } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 export function BrandLogo({
@@ -17,13 +17,17 @@ export function BrandLogo({
     <Link
       href={href}
       className={cn("group inline-flex items-center gap-2.5", className)}
-      aria-label="EventFlow home"
+      aria-label="Kampus home"
     >
-      <span className={cn(
-        "relative grid size-9 place-items-center rounded-xl shadow-sm transition-all group-hover:scale-105",
-        onDark ? "bg-indigo-600 text-white" : "bg-indigo-600 text-white"
-      )}>
-        <Ticket className="size-5 transition-transform group-hover:-rotate-12" />
+      <span className="relative grid size-9 place-items-center rounded-xl transition-all group-hover:scale-105 overflow-hidden">
+        <Image
+          src="/logo.png"
+          alt="Kampus logo"
+          width={36}
+          height={36}
+          className="size-9 object-contain"
+          priority
+        />
       </span>
       <span className="leading-tight">
         <span
@@ -32,7 +36,7 @@ export function BrandLogo({
             onDark ? "text-white" : "text-slate-900",
           )}
         >
-          Event<span className="text-indigo-600">Flow</span>
+          Kam<span className="text-indigo-600">pus</span>
         </span>
         {subtitle ? (
           <span

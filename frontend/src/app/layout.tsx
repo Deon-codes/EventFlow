@@ -17,11 +17,15 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "EventFlow · Campus event ticketing",
-    template: "%s · EventFlow",
+    default: "Kampus · Campus event ticketing",
+    template: "%s · Kampus",
   },
   description:
-    "EventFlow is a campus event ticketing and management system: discover events, register for tickets, and run organizer dashboards.",
+    "Kampus is a campus event ticketing and management system: discover events, register for tickets, and run organizer dashboards.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

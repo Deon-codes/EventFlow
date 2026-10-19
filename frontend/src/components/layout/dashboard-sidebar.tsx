@@ -163,7 +163,7 @@ function RailContent({
         <button
           type="button"
           aria-label="Sign out"
-          title="Sign out of EventFlow"
+          title="Sign out of Kampus"
           className="grid size-9 place-items-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
           onClick={async () => {
             await fetch("/api/auth/logout", { method: "POST" });

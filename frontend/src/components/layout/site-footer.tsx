@@ -11,7 +11,7 @@ export function SiteFooter() {
           <div className="md:col-span-2 space-y-4">
             <BrandLogo subtitle="Campus Event Ticketing" />
             <p className="max-w-md text-sm text-slate-500 leading-relaxed">
-              EventFlow is the official campus event ticketing and student engagement platform.
+              Kampus is the official campus event ticketing and student engagement platform.
               Discover campus fests, technical hackathons, workshops, and sports tournaments in one place.
             </p>
             <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
@@ -85,7 +85,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-6 sm:flex-row text-xs text-slate-400">
-          <p>© {new Date().getFullYear()} EventFlow Ticketing System. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Kampus Ticketing System. All rights reserved.</p>
           <p className="flex items-center gap-1">
             Built for Cloud Computing Lab Mini-Project
           </p>

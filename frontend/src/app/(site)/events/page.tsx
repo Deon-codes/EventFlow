@@ -10,7 +10,7 @@ import { dbService } from "@/lib/db-service";
 
 export const metadata: Metadata = {
   title: "Explore Events",
-  description: "Browse and register for campus events on EventFlow.",
+  description: "Browse and register for campus events on Kampus.",
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;
